@@ -96,6 +96,8 @@
             gap: 0.75rem;
             border-bottom: 1px solid var(--divider);
             padding-bottom: 0;
+            justify-content: center;
+            text-align: center;
         }
 
         .page .pacenote:last-child { border-bottom: none; }
@@ -107,6 +109,17 @@
             text-align: right;
             flex-shrink: 0;
             padding-top: 0.2rem;
+        }
+
+        .note-text {
+            flex: 1;
+            outline: none;
+            border-radius: 2px;
+        }
+
+        .note-text:focus {
+            background: #1e1e1e;
+            outline: 1px solid var(--accent);
         }
 
         /* ── Danger highlighting ─────────────────────────────── */
@@ -246,7 +259,19 @@
         return frag;
     }
 
+    // Master list of edited note texts, kept in sync with contenteditable spans
+    const noteTexts = [];
+
+    function reHighlight(editSpan, idx) {
+        const text = editSpan.textContent;
+        noteTexts[idx] = text;
+        // Rebuild highlighting without disturbing cursor
+        // (we only re-render on blur to avoid cursor-jump issues)
+    }
+
     function buildNote(index, text) {
+        noteTexts[index] = text;
+
         const row = document.createElement('div');
         row.className = 'pacenote';
 
@@ -255,7 +280,32 @@
         num.textContent = index + 1;
         row.appendChild(num);
 
-        row.appendChild(highlightText(text));
+        // Editable text span — highlighting applied on blur, raw text while editing
+        const editSpan = document.createElement('span');
+        editSpan.className = 'note-text';
+        editSpan.contentEditable = 'true';
+        editSpan.spellcheck = false;
+        editSpan.appendChild(highlightText(text));
+
+        editSpan.addEventListener('focus', () => {
+            // Strip to plain text while editing so cursor works cleanly
+            editSpan.textContent = noteTexts[index];
+        });
+
+        editSpan.addEventListener('blur', () => {
+            const updated = editSpan.textContent.trim();
+            noteTexts[index] = updated;
+            editSpan.innerHTML = '';
+            editSpan.appendChild(highlightText(updated));
+        });
+
+        editSpan.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); editSpan.blur(); }
+            // Prevent arrow keys from changing page while editing
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.stopPropagation();
+        });
+
+        row.appendChild(editSpan);
         return row;
     }
 
@@ -293,37 +343,42 @@
 
     showPage(0);
 
-    // Build print pages
+    // Build print pages — reads noteTexts at print time so edits are captured
     const printout = document.getElementById('printout');
     const titleText = document.getElementById('title').textContent;
-    const totalPages = Math.ceil(raw.length / NOTES_PER_PAGE);
 
-    for (let i = 0; i < raw.length; i += NOTES_PER_PAGE) {
-        const pp = document.createElement('div');
-        pp.className = 'print-page';
+    function buildPrintPages() {
+        printout.innerHTML = '';
+        const totalPages = Math.ceil(noteTexts.length / NOTES_PER_PAGE);
+        for (let i = 0; i < noteTexts.length; i += NOTES_PER_PAGE) {
+            const pp = document.createElement('div');
+            pp.className = 'print-page';
 
-        const ph = document.createElement('div');
-        ph.className = 'print-header';
-        ph.innerHTML = `<span>${titleText}</span><span>Page ${Math.floor(i/NOTES_PER_PAGE)+1} / ${totalPages}</span>`;
-        pp.appendChild(ph);
+            const ph = document.createElement('div');
+            ph.className = 'print-header';
+            ph.innerHTML = `<span>${titleText}</span><span>Page ${Math.floor(i/NOTES_PER_PAGE)+1} / ${totalPages}</span>`;
+            pp.appendChild(ph);
 
-        const pn = document.createElement('div');
-        pn.className = 'print-notes';
+            const pn = document.createElement('div');
+            pn.className = 'print-notes';
 
-        raw.slice(i, i + NOTES_PER_PAGE).forEach((text, j) => {
-            const row = document.createElement('div');
-            row.className = 'print-note';
-            const num = document.createElement('span');
-            num.className = 'print-num';
-            num.textContent = i + j + 1;
-            row.appendChild(num);
-            row.appendChild(highlightText(text));
-            pn.appendChild(row);
-        });
+            noteTexts.slice(i, i + NOTES_PER_PAGE).forEach((text, j) => {
+                const row = document.createElement('div');
+                row.className = 'print-note';
+                const num = document.createElement('span');
+                num.className = 'print-num';
+                num.textContent = i + j + 1;
+                row.appendChild(num);
+                row.appendChild(highlightText(text));
+                pn.appendChild(row);
+            });
 
-        pp.appendChild(pn);
-        printout.appendChild(pp);
+            pp.appendChild(pn);
+            printout.appendChild(pp);
+        }
     }
+
+    window.addEventListener('beforeprint', buildPrintPages);
 </script>
 </body>
 </html>
