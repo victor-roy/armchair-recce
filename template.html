@@ -5,108 +5,325 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rally Pace Notes</title>
     <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         :root {
             --accent: #e8a000;
-            --bg: #111;
-            --surface: #1c1c1c;
-            --border: #2e2e2e;
+            --bg: #0e0e0e;
             --text: #f0f0f0;
-            --muted: #888;
+            --muted: #555;
+            --divider: #2a2a2a;
         }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: 'Courier New', Courier, monospace;
             background: var(--bg);
             color: var(--text);
-            padding: 2rem;
+            height: 100vh;
+            overflow: hidden;
         }
 
-        header {
-            border-bottom: 2px solid var(--accent);
-            padding-bottom: 1rem;
-            margin-bottom: 1.5rem;
+        /* ── Header ─────────────────────────────────────────── */
+        #header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-end;
+            align-items: center;
+            padding: 0.6rem 1.5rem;
+            border-bottom: 2px solid var(--accent);
         }
 
-        h1 {
-            font-size: 1.1rem;
-            font-weight: bold;
+        #title {
+            font-size: 0.95rem;
             color: var(--accent);
-            max-width: 75%;
-            line-height: 1.4;
+            font-weight: bold;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 65%;
         }
 
-        .meta {
-            font-size: 0.75rem;
-            color: var(--muted);
-            text-align: right;
+        #nav {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
 
-        .notes-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 0.3rem;
+        #page-counter {
+            font-size: 0.8rem;
+            color: var(--text);
+            min-width: 4rem;
+            text-align: center;
         }
+
+        #nav button {
+            background: none;
+            border: 1px solid var(--muted);
+            color: var(--text);
+            padding: 0.2rem 0.65rem;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.8rem;
+        }
+        #nav button:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* ── Page stage ─────────────────────────────────────── */
+        #stage {
+            position: relative;
+            /* fills viewport minus header and hint */
+            height: calc(100vh - 48px - 28px);
+        }
+
+        .page {
+            display: none;
+            position: absolute;
+            inset: 0;
+            /* center notes column */
+            flex-direction: column;
+            justify-content: space-evenly;
+            align-items: center;
+            padding: 2.5rem 2rem;
+        }
+
+        .page.active { display: flex; }
 
         .pacenote {
-            background: var(--surface);
-            border-left: 3px solid var(--border);
-            padding: 0.45rem 0.75rem;
-            font-size: 1rem;
-            line-height: 1.5;
-            counter-increment: note;
+            width: 100%;
+            max-width: 640px;
+            font-size: 1.6rem;
+            line-height: 1.4;
+            display: flex;
+            align-items: baseline;
+            gap: 0.75rem;
+            border-bottom: 1px solid var(--divider);
+            padding-bottom: 0;
         }
 
-        .pacenote::before {
-            content: counter(note) ". ";
+        .page .pacenote:last-child { border-bottom: none; }
+
+        .note-num {
+            font-size: 0.65rem;
             color: var(--muted);
-            font-size: 0.75rem;
-            margin-right: 0.25rem;
+            min-width: 1.6rem;
+            text-align: right;
+            flex-shrink: 0;
+            padding-top: 0.2rem;
         }
 
-        .notes-grid { counter-reset: note; }
+        /* ── Danger highlighting ─────────────────────────────── */
+        .hl-caution { color: #ff3b3b; font-weight: bold; }
+        .hl-care    { color: #ff8c69; font-weight: bold; }
+        .hl-dont    { color: #ff3b3b; font-weight: bold; }
 
-        /* ── Print styles ─────────────────────────────── */
+        /* ── Hint bar ────────────────────────────────────────── */
+        #hint {
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.68rem;
+            color: var(--muted);
+        }
+
+        /* ── Print ──────────────────────────────────────────── */
         @media print {
-            body {
-                background: #fff;
-                color: #000;
-                padding: 1cm;
-                font-size: 11pt;
+            body { background: #fff; color: #000; height: auto; overflow: visible; }
+            #header, #stage, #hint { display: none; }
+            #printout { display: block !important; }
+
+            .print-page {
+                page-break-after: always;
+                padding: 1.5cm;
+                font-family: 'Courier New', Courier, monospace;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-evenly;
+                min-height: 24cm;
+            }
+            .print-page:last-child { page-break-after: auto; }
+
+            .print-header {
+                font-size: 9pt;
+                color: #555;
+                border-bottom: 1.5pt solid #000;
+                padding-bottom: 4pt;
+                margin-bottom: 8pt;
+                display: flex;
+                justify-content: space-between;
             }
 
-            header { border-bottom-color: #000; }
-            h1 { color: #000; font-size: 12pt; }
-            .meta { color: #555; }
+            .print-notes { display: flex; flex-direction: column; flex: 1; justify-content: space-evenly; }
 
-            .notes-grid {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 2pt;
+            .print-note {
+                font-size: 14pt;
+                line-height: 1.6;
+                border-bottom: 0.5pt solid #ddd;
+                padding: 2pt 0;
+                display: flex;
+                gap: 8pt;
+                align-items: baseline;
+            }
+            .print-note:last-child { border-bottom: none; }
+
+            .print-num {
+                font-size: 7pt;
+                color: #999;
+                min-width: 18pt;
+                text-align: right;
+                flex-shrink: 0;
             }
 
-            .pacenote {
-                background: none;
-                border-left: 2pt solid #ccc;
-                padding: 3pt 6pt;
-                font-size: 10pt;
-                break-inside: avoid;
-            }
-
-            .pacenote::before { color: #999; }
+            .hl-caution { color: #cc0000; font-weight: bold; }
+            .hl-care    { color: #cc5500; font-weight: bold; }
+            .hl-dont    { color: #cc0000; font-weight: bold; }
         }
     </style>
 </head>
 <body>
-    <header>
-        <h1>Rally Pace Notes</h1>
-        <div class="meta">Generated by GoRally &bull; gorally.py</div>
-    </header>
-    <div class="notes-grid">
-        <!-- PACENOTES_PLACEHOLDER -->
+
+<div id="header">
+    <div id="title">Rally Pace Notes</div>
+    <div id="nav">
+        <button onclick="changePage(-1)">&#8593; Prev</button>
+        <span id="page-counter">1 / 1</span>
+        <button onclick="changePage(1)">Next &#8595;</button>
+        <button onclick="window.print()">Print</button>
     </div>
+</div>
+
+<div id="stage">
+    <!-- PACENOTES_PLACEHOLDER -->
+</div>
+
+<div id="hint">&#8593; &#8595; arrow keys &nbsp;&middot;&nbsp; Ctrl+P to print</div>
+
+<div id="printout" style="display:none"></div>
+
+<script>
+    const NOTES_PER_PAGE = 7;
+
+    // Words to highlight and their CSS class
+    const HIGHLIGHTS = [
+        { pattern: /\bCAUTION\b/gi, cls: 'hl-caution' },
+        { pattern: /\bCARE\b/gi,    cls: 'hl-care'    },
+        { pattern: /\bDONT\b/gi,    cls: 'hl-dont'    },
+        { pattern: /!/g,            cls: 'hl-caution'  },
+    ];
+
+    function highlightText(text) {
+        // Returns an array of DOM nodes (spans + text nodes)
+        const frag = document.createDocumentFragment();
+        let remaining = text;
+
+        while (remaining.length) {
+            let earliest = null, earliestIdx = Infinity, earliestCls = '';
+
+            for (const { pattern, cls } of HIGHLIGHTS) {
+                pattern.lastIndex = 0;
+                const m = pattern.exec(remaining);
+                if (m && m.index < earliestIdx) {
+                    earliest = m;
+                    earliestIdx = m.index;
+                    earliestCls = cls;
+                }
+            }
+
+            if (!earliest) {
+                frag.appendChild(document.createTextNode(remaining));
+                break;
+            }
+
+            if (earliestIdx > 0)
+                frag.appendChild(document.createTextNode(remaining.slice(0, earliestIdx)));
+
+            const span = document.createElement('span');
+            span.className = earliestCls;
+            span.textContent = earliest[0];
+            frag.appendChild(span);
+
+            remaining = remaining.slice(earliestIdx + earliest[0].length);
+        }
+
+        return frag;
+    }
+
+    function buildNote(index, text) {
+        const row = document.createElement('div');
+        row.className = 'pacenote';
+
+        const num = document.createElement('span');
+        num.className = 'note-num';
+        num.textContent = index + 1;
+        row.appendChild(num);
+
+        row.appendChild(highlightText(text));
+        return row;
+    }
+
+    // Collect raw notes injected by Python
+    const raw = Array.from(document.querySelectorAll('#stage .pacenote')).map(n => n.textContent);
+
+    // Build screen pages
+    const stage = document.getElementById('stage');
+    stage.innerHTML = '';
+
+    const pages = [];
+    for (let i = 0; i < raw.length; i += NOTES_PER_PAGE) {
+        const page = document.createElement('div');
+        page.className = 'page';
+        raw.slice(i, i + NOTES_PER_PAGE).forEach((text, j) => page.appendChild(buildNote(i + j, text)));
+        stage.appendChild(page);
+        pages.push(page);
+    }
+
+    let current = 0;
+
+    function showPage(n) {
+        pages[current].classList.remove('active');
+        current = Math.max(0, Math.min(n, pages.length - 1));
+        pages[current].classList.add('active');
+        document.getElementById('page-counter').textContent = `${current + 1} / ${pages.length}`;
+    }
+
+    function changePage(dir) { showPage(current + dir); }
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); changePage(1); }
+        if (e.key === 'ArrowUp'   || e.key === 'PageUp')   { e.preventDefault(); changePage(-1); }
+    });
+
+    showPage(0);
+
+    // Build print pages
+    const printout = document.getElementById('printout');
+    const titleText = document.getElementById('title').textContent;
+    const totalPages = Math.ceil(raw.length / NOTES_PER_PAGE);
+
+    for (let i = 0; i < raw.length; i += NOTES_PER_PAGE) {
+        const pp = document.createElement('div');
+        pp.className = 'print-page';
+
+        const ph = document.createElement('div');
+        ph.className = 'print-header';
+        ph.innerHTML = `<span>${titleText}</span><span>Page ${Math.floor(i/NOTES_PER_PAGE)+1} / ${totalPages}</span>`;
+        pp.appendChild(ph);
+
+        const pn = document.createElement('div');
+        pn.className = 'print-notes';
+
+        raw.slice(i, i + NOTES_PER_PAGE).forEach((text, j) => {
+            const row = document.createElement('div');
+            row.className = 'print-note';
+            const num = document.createElement('span');
+            num.className = 'print-num';
+            num.textContent = i + j + 1;
+            row.appendChild(num);
+            row.appendChild(highlightText(text));
+            pn.appendChild(row);
+        });
+
+        pp.appendChild(pn);
+        printout.appendChild(pp);
+    }
+</script>
 </body>
 </html>

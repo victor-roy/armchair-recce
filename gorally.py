@@ -20,8 +20,11 @@ assert "ASSEMBLY_AI_API_KEY" in os.environ, "ASSEMBLY_AI_API_KEY not set in .env
 aai.settings.api_key = os.environ["ASSEMBLY_AI_API_KEY"]
 genai_client = genai.Client()
 
-GEMINI_MODEL = 'gemini-2.0-flash'
+GEMINI_MODEL = 'gemini-2.5-flash'
 TEMP_DIR = os.path.join("outputs", "temp")
+
+PROMPT_PATH = "pacenotes_transcription_prompt.md"
+
 
 
 def download_youtube_audio(url):
@@ -110,33 +113,8 @@ def transcribe_and_diarize(audio_path):
 
 
 def translate_to_pacenotes(codriver_transcription):
-    prompt = f"""You are an expert rally co-driver and pace note editor.
-
-The following is a transcription of ONLY the co-driver's speech from a rally onboard video.
-Driver reactions and comments have already been removed.
-
-Convert this into clean, ultra-concise rally pace note shorthand, one call per line.
-
-Rules:
-- Use standard shorthand: R/L for direction, numbers 1-6 for severity, Cr for crest, K for kink, J for junction, H for hairpin
-- Include distance calls (e.g. "50", "into") where present
-- Correct transcription errors using rally context: "Kings" → "kinks", "Titans" → "tightens", etc.
-- Do NOT include timestamps in the output
-- Each pace note call on its own line
-- Group tightly related calls on one line with " / " separator only if called together in one breath
-
-Example Input:
-[10.52s -> 12.88s] right five over crest
-[13.12s -> 14.90s] and left four tightens into thirty right two
-
-Example Output:
-R5 / Cr
-L4 tightens
-30 R2
-
-Transcription:
-{codriver_transcription}
-"""
+    with open(PROMPT_PATH, "r") as f:
+        prompt = f.read().replace("{{TRANSCRIPTION}}", codriver_transcription)
     logging.info("Sending to Gemini for pace note conversion...")
     response = genai_client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
     return response.text.strip()
@@ -170,9 +148,9 @@ def save_pacenotes_to_html(title, pace_notes, output_dir, template_path="templat
 def main():
     parser = argparse.ArgumentParser(description="Rally onboard → printable pace notes.")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--link", help="YouTube URL")
-    group.add_argument("--path", help="Local video file path")
-    group.add_argument("--transcription_file", help="Existing co-driver transcription file")
+    group.add_argument("--link", "-l", help="YouTube URL")
+    group.add_argument("--path", "-p", help="Local video file path")
+    group.add_argument("--transcription-file", "-tf", help="Existing co-driver transcription file")
     args = parser.parse_args()
 
     audio_file = None
