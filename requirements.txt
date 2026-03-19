@@ -1,4 +1,4 @@
 yt-dlp
-faster-whisper
-google-generativeai
+assemblyai
+google-genai
 python-dotenv
