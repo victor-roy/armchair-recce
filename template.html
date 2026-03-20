@@ -227,12 +227,6 @@
                 style="width:3rem;background:#1a1a1a;border:1px solid var(--muted);color:var(--text);font-family:inherit;font-size:0.8rem;padding:0.2rem 0.3rem;text-align:center"
                 onchange="rebuildPages(+this.value)">
         </label>
-        <select id="color-picker" onchange="setAccent(this.value)" title="Accent colour">
-            <option value="#ff69b4">Pink</option>
-            <option value="#e8a000">Orange</option>
-            <option value="#00cfcf">Cyan</option>
-            <option value="#7fff7f">Green</option>
-        </select>
         <button onclick="changePage(-1)">&#8593; Prev</button>
         <span id="page-counter">1 / 1</span>
         <button onclick="changePage(1)">Next &#8595;</button>
@@ -245,7 +239,7 @@
     <!-- PACENOTES_PLACEHOLDER -->
 </div>
 
-<div id="hint">&#8593; &#8595; arrow keys &nbsp;&middot;&nbsp; Ctrl+P to print</div>
+<div id="hint">arrow keys to navigate &nbsp;&middot;&nbsp; Ctrl+P to print</div>
 
 <div id="printout" style="display:none"></div>
 
@@ -426,8 +420,8 @@
     function changePage(dir) { showPage(current + dir); }
 
     document.addEventListener('keydown', e => {
-        if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); changePage(1); }
-        if (e.key === 'ArrowUp'   || e.key === 'PageUp')   { e.preventDefault(); changePage(-1); }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); changePage(1); }
+        if (e.key === 'ArrowUp'   || e.key === 'ArrowLeft'  || e.key === 'PageUp')   { e.preventDefault(); changePage(-1); }
     });
 
     showPage(0);
@@ -509,11 +503,6 @@
         }
         current = 0;
         showPage(0);
-    }
-
-    // ── Accent colour picker ─────────────────────────────────────────────────
-    function setAccent(color) {
-        document.documentElement.style.setProperty('--accent', color);
     }
 
     // ── Save ─────────────────────────────────────────────────────────────────

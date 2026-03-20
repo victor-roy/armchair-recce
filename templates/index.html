@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoRally</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --accent: #ff69b4;
+            --bg: #0e0e0e;
+            --text: #f0f0f0;
+            --muted: #555;
+            --divider: #2a2a2a;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+            margin-bottom: 0.4rem;
+        }
+
+        header p {
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+
+        /* ── Tabs ─────────────────────────────────────── */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .tab-btn {
+            background: none;
+            border: 1px solid var(--muted);
+            color: var(--muted);
+            font-family: inherit;
+            font-size: 0.8rem;
+            padding: 0.35rem 0.9rem;
+            cursor: pointer;
+            transition: border-color 0.15s, color 0.15s;
+        }
+
+        .tab-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+        .tab-btn.active {
+            border-color: var(--accent);
+            color: var(--accent);
+            border-bottom-color: var(--bg);
+            margin-bottom: -1px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ── Card ─────────────────────────────────────── */
+        .card {
+            width: 100%;
+            max-width: 580px;
+            border: 1px solid var(--accent);
+            padding: 2rem 2.5rem 2.5rem;
+        }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* ── Form elements ────────────────────────────── */
+        label {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-bottom: 0.4rem;
+            margin-top: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        label:first-child { margin-top: 0; }
+
+        input[type="text"],
+        input[type="url"] {
+            width: 100%;
+            background: #141414;
+            border: 1px solid var(--muted);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.9rem;
+            padding: 0.5rem 0.75rem;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        input[type="text"]:focus,
+        input[type="url"]:focus { border-color: var(--accent); }
+
+        /* File picker */
+        .file-area {
+            border: 1px dashed var(--muted);
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.15s;
+            position: relative;
+        }
+
+        .file-area:hover { border-color: var(--accent); }
+        .file-area.has-file { border-color: var(--accent); border-style: solid; }
+
+        .file-area input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .file-label {
+            font-size: 0.8rem;
+            color: var(--muted);
+            pointer-events: none;
+        }
+
+        .file-label span { color: var(--accent); }
+
+        .file-name {
+            font-size: 0.8rem;
+            color: var(--text);
+            margin-top: 0.3rem;
+            word-break: break-all;
+        }
+
+        /* Optional title field */
+        .optional-title { margin-top: 1rem; }
+
+        /* Submit button */
+        .submit-btn {
+            display: block;
+            width: 100%;
+            margin-top: 1.8rem;
+            padding: 0.6rem;
+            background: none;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            font-family: inherit;
+            font-size: 0.9rem;
+            cursor: pointer;
+            letter-spacing: 0.08em;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .submit-btn:hover { background: var(--accent); color: var(--bg); }
+        .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* ── Progress ──────────────────────────────────── */
+        #progress-view { display: none; text-align: center; flex-direction: column; align-items: center; }
+
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 2px solid var(--divider);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+            margin: 0 auto 1.2rem;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #status-msg {
+            font-size: 0.9rem;
+            color: var(--muted);
+            min-height: 1.4em;
+        }
+
+        #error-msg {
+            color: #ff3b3b;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .result-btn {
+            display: inline-block;
+            margin-top: 1.5rem;
+            padding: 0.55rem 1.4rem;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            font-family: inherit;
+            font-size: 0.9rem;
+            text-decoration: none;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .result-btn:hover { background: var(--accent); color: var(--bg); }
+
+        #restart-btn {
+            display: none;
+            margin-top: 1rem;
+            background: none;
+            border: none;
+            color: var(--muted);
+            font-family: inherit;
+            font-size: 0.75rem;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        #restart-btn:hover { color: var(--text); }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>GORALLY</h1>
+    <p>onboard video → printable pace notes</p>
+</header>
+
+<div class="tabs" id="tabs">
+    <button class="tab-btn active" data-tab="youtube">YouTube Link</button>
+    <button class="tab-btn" data-tab="local">Local Video</button>
+    <button class="tab-btn" data-tab="transcription">Transcription File</button>
+    <button class="tab-btn" data-tab="rerender">Re-render</button>
+</div>
+
+<div class="card">
+
+    <!-- ── YouTube ─────────────────────────────────── -->
+    <div class="tab-panel active" id="tab-youtube">
+        <label>YouTube URL</label>
+        <input type="url" id="yt-url" placeholder="https://www.youtube.com/watch?v=...">
+        <button class="submit-btn" onclick="submit('youtube')">Generate Pace Notes</button>
+    </div>
+
+    <!-- ── Local Video ─────────────────────────────── -->
+    <div class="tab-panel" id="tab-local">
+        <label>Video File</label>
+        <div class="file-area" id="local-area">
+            <input type="file" accept="video/*,audio/*" onchange="fileChosen(this, 'local-area', 'local-name')">
+            <div class="file-label">Click to browse or drag a file — <span>select video</span></div>
+            <div class="file-name" id="local-name"></div>
+        </div>
+        <button class="submit-btn" onclick="submit('local')">Extract &amp; Generate</button>
+    </div>
+
+    <!-- ── Transcription File ──────────────────────── -->
+    <div class="tab-panel" id="tab-transcription">
+        <label>Transcription File (.txt)</label>
+        <div class="file-area" id="transcription-area">
+            <input type="file" accept=".txt,text/plain" onchange="fileChosen(this, 'transcription-area', 'transcription-name')">
+            <div class="file-label">Click to browse — <span>select transcription.txt</span></div>
+            <div class="file-name" id="transcription-name"></div>
+        </div>
+        <div class="optional-title">
+            <label>Stage title <span style="color:var(--muted);text-transform:none">(optional — defaults to filename)</span></label>
+            <input type="text" id="transcription-title" placeholder="e.g. Overmountain SS3">
+        </div>
+        <button class="submit-btn" onclick="submit('transcription')">Generate Pace Notes</button>
+    </div>
+
+    <!-- ── Re-render ───────────────────────────────── -->
+    <div class="tab-panel" id="tab-rerender">
+        <label>Pace Notes File (pacenotes.txt)</label>
+        <div class="file-area" id="rerender-area">
+            <input type="file" accept=".txt,text/plain" onchange="fileChosen(this, 'rerender-area', 'rerender-name')">
+            <div class="file-label">Click to browse — <span>select pacenotes.txt</span></div>
+            <div class="file-name" id="rerender-name"></div>
+        </div>
+        <div class="optional-title">
+            <label>Stage title <span style="color:var(--muted);text-transform:none">(optional — defaults to filename)</span></label>
+            <input type="text" id="rerender-title" placeholder="e.g. Overmountain SS3">
+        </div>
+        <button class="submit-btn" onclick="submit('rerender')">Re-render HTML</button>
+    </div>
+
+    <!-- ── Progress ────────────────────────────────── -->
+    <div id="progress-view">
+        <div class="spinner"></div>
+        <div id="status-msg">Starting...</div>
+        <div id="error-msg"></div>
+        <a id="result-link" class="result-btn" href="#" target="_blank" style="display:none">Open Pace Notes ↗</a>
+        <button id="restart-btn" onclick="restart()" style="display:none">← start over</button>
+    </div>
+
+</div>
+
+<script>
+    // ── Tab switching ────────────────────────────────
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        });
+    });
+
+    // ── File chooser ─────────────────────────────────
+    const fileInputs = {};
+
+    function fileChosen(input, areaId, nameId) {
+        const file = input.files[0];
+        if (!file) return;
+        fileInputs[areaId] = file;
+        document.getElementById(areaId).classList.add('has-file');
+        document.getElementById(nameId).textContent = file.name;
+    }
+
+    // ── Submit ───────────────────────────────────────
+    function submit(mode) {
+        const formData = new FormData();
+        formData.append('mode', mode);
+
+        if (mode === 'youtube') {
+            const url = document.getElementById('yt-url').value.trim();
+            if (!url) { alert('Please enter a YouTube URL.'); return; }
+            formData.append('url', url);
+        } else if (mode === 'local') {
+            const f = fileInputs['local-area'];
+            if (!f) { alert('Please select a video file.'); return; }
+            formData.append('file', f);
+        } else if (mode === 'transcription') {
+            const f = fileInputs['transcription-area'];
+            if (!f) { alert('Please select a transcription file.'); return; }
+            formData.append('file', f);
+            formData.append('title', document.getElementById('transcription-title').value.trim());
+        } else if (mode === 'rerender') {
+            const f = fileInputs['rerender-area'];
+            if (!f) { alert('Please select a pacenotes.txt file.'); return; }
+            formData.append('file', f);
+            formData.append('title', document.getElementById('rerender-title').value.trim());
+        }
+
+        showProgress();
+
+        fetch('/process', { method: 'POST', body: formData })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) { showError(data.error); return; }
+                poll(data.job_id);
+            })
+            .catch(err => showError(err.toString()));
+    }
+
+    // ── Polling ──────────────────────────────────────
+    function poll(jobId) {
+        fetch('/status/' + jobId)
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('status-msg').textContent = data.message;
+                if (data.status === 'done') {
+                    document.querySelector('.spinner').style.display = 'none';
+                    const link = document.getElementById('result-link');
+                    link.href = data.result_url;
+                    link.style.display = 'inline-block';
+                    document.getElementById('restart-btn').style.display = 'block';
+                } else if (data.status === 'error') {
+                    showError(data.message);
+                } else {
+                    setTimeout(() => poll(jobId), 2000);
+                }
+            })
+            .catch(err => showError(err.toString()));
+    }
+
+    // ── UI state helpers ─────────────────────────────
+    function showProgress() {
+        document.getElementById('tabs').style.display = 'none';
+        document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+        document.getElementById('progress-view').style.display = 'flex';
+    }
+
+    function showError(msg) {
+        document.querySelector('.spinner').style.display = 'none';
+        document.getElementById('status-msg').textContent = 'Something went wrong.';
+        const err = document.getElementById('error-msg');
+        err.textContent = msg;
+        err.style.display = 'block';
+        document.getElementById('restart-btn').style.display = 'block';
+    }
+
+    function restart() {
+        document.getElementById('tabs').style.display = 'flex';
+        document.querySelectorAll('.tab-panel').forEach(p => p.style.display = '');
+        document.querySelector('.tab-btn.active').click();
+        document.getElementById('progress-view').style.display = 'none';
+        document.querySelector('.spinner').style.display = 'block';
+        document.getElementById('result-link').style.display = 'none';
+        document.getElementById('error-msg').style.display = 'none';
+        document.getElementById('restart-btn').style.display = 'none';
+    }
+</script>
+
+
+</body>
+</html>
