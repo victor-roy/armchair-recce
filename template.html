@@ -8,7 +8,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-            --accent: #e8a000;
+            --accent: #ff69b4;
             --bg: #0e0e0e;
             --text: #f0f0f0;
             --muted: #555;
@@ -55,7 +55,7 @@
             text-align: center;
         }
 
-        #nav button {
+        #nav button, #nav select {
             background: none;
             border: 1px solid var(--muted);
             color: var(--text);
@@ -65,6 +65,7 @@
             font-size: 0.8rem;
         }
         #nav button:hover { border-color: var(--accent); color: var(--accent); }
+        #nav select { background: #1a1a1a; }
 
         /* ── Page stage ─────────────────────────────────────── */
         #stage {
@@ -115,12 +116,35 @@
             flex: 1;
             outline: none;
             border-radius: 2px;
+            cursor: default;
         }
 
-        .note-text:focus {
+        .note-text[contenteditable="true"] {
             background: #1e1e1e;
             outline: 1px solid var(--accent);
+            cursor: text;
         }
+
+        .note-actions {
+            display: flex;
+            gap: 0.25rem;
+            opacity: 0;
+            transition: opacity 0.15s;
+            flex-shrink: 0;
+        }
+        .pacenote:hover .note-actions { opacity: 1; }
+
+        .note-actions button {
+            background: none;
+            border: 1px solid var(--muted);
+            color: var(--muted);
+            font-family: inherit;
+            font-size: 0.7rem;
+            padding: 0.1rem 0.35rem;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .note-actions button:hover { border-color: var(--accent); color: var(--accent); }
 
         /* ── Danger highlighting ─────────────────────────────── */
         .hl-caution { color: #ff3b3b; font-weight: bold; }
@@ -194,11 +218,25 @@
 <body>
 
 <div id="header">
-    <div id="title">Rally Pace Notes</div>
+    <div id="title">
+        Rally Pace Notes<!--YOUTUBE_LINK_PLACEHOLDER-->
+    </div>
     <div id="nav">
+        <label style="font-size:0.8rem;color:var(--muted)">Notes/page
+            <input id="notes-per-page" type="number" min="1" max="20" value="7"
+                style="width:3rem;background:#1a1a1a;border:1px solid var(--muted);color:var(--text);font-family:inherit;font-size:0.8rem;padding:0.2rem 0.3rem;text-align:center"
+                onchange="rebuildPages(+this.value)">
+        </label>
+        <select id="color-picker" onchange="setAccent(this.value)" title="Accent colour">
+            <option value="#ff69b4">Pink</option>
+            <option value="#e8a000">Orange</option>
+            <option value="#00cfcf">Cyan</option>
+            <option value="#7fff7f">Green</option>
+        </select>
         <button onclick="changePage(-1)">&#8593; Prev</button>
         <span id="page-counter">1 / 1</span>
         <button onclick="changePage(1)">Next &#8595;</button>
+        <button onclick="saveHTML()">Save</button>
         <button onclick="window.print()">Print</button>
     </div>
 </div>
@@ -220,6 +258,7 @@
         { pattern: /\bCARE\b/gi,    cls: 'hl-care'    },
         { pattern: /\bDONT\b/gi,    cls: 'hl-dont'    },
         { pattern: /!/g,            cls: 'hl-caution'  },
+        { pattern: />/g,            cls: 'hl-care'     },
     ];
 
     function highlightText(text) {
@@ -259,14 +298,40 @@
         return frag;
     }
 
-    // Master list of edited note texts, kept in sync with contenteditable spans
+    // Master list of current note texts (updated on confirmed edit)
     const noteTexts = [];
 
-    function reHighlight(editSpan, idx) {
-        const text = editSpan.textContent;
-        noteTexts[idx] = text;
-        // Rebuild highlighting without disturbing cursor
-        // (we only re-render on blur to avoid cursor-jump issues)
+    function setEditing(editSpan, index, enabled) {
+        if (enabled) {
+            editSpan.contentEditable = 'true';
+            editSpan.dataset.before = noteTexts[index];
+            editSpan.textContent = noteTexts[index];
+            editSpan.focus();
+            // Place cursor at end
+            const range = document.createRange();
+            range.selectNodeContents(editSpan);
+            range.collapse(false);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+        } else {
+            editSpan.contentEditable = 'false';
+        }
+    }
+
+    function confirmEdit(editSpan, index) {
+        const updated = editSpan.textContent.trim();
+        if (updated === noteTexts[index]) { setEditing(editSpan, index, false); return; }
+        snapshot();
+        noteTexts[index] = updated;
+        editSpan.innerHTML = '';
+        editSpan.appendChild(highlightText(updated));
+        setEditing(editSpan, index, false);
+    }
+
+    function cancelEdit(editSpan, index) {
+        editSpan.innerHTML = '';
+        editSpan.appendChild(highlightText(noteTexts[index]));
+        setEditing(editSpan, index, false);
     }
 
     function buildNote(index, text) {
@@ -280,32 +345,56 @@
         num.textContent = index + 1;
         row.appendChild(num);
 
-        // Editable text span — highlighting applied on blur, raw text while editing
         const editSpan = document.createElement('span');
         editSpan.className = 'note-text';
-        editSpan.contentEditable = 'true';
+        editSpan.contentEditable = 'false';
         editSpan.spellcheck = false;
         editSpan.appendChild(highlightText(text));
 
-        editSpan.addEventListener('focus', () => {
-            // Strip to plain text while editing so cursor works cleanly
-            editSpan.textContent = noteTexts[index];
-        });
-
-        editSpan.addEventListener('blur', () => {
-            const updated = editSpan.textContent.trim();
-            noteTexts[index] = updated;
-            editSpan.innerHTML = '';
-            editSpan.appendChild(highlightText(updated));
-        });
+        editSpan.addEventListener('dblclick', () => setEditing(editSpan, index, true));
 
         editSpan.addEventListener('keydown', e => {
-            if (e.key === 'Enter') { e.preventDefault(); editSpan.blur(); }
-            // Prevent arrow keys from changing page while editing
+            if (editSpan.contentEditable !== 'true') return;
+            if (e.key === 'Enter') { e.preventDefault(); confirmEdit(editSpan, index); }
+            if (e.key === 'Escape') { e.preventDefault(); cancelEdit(editSpan, index); }
             if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.stopPropagation();
         });
 
+        editSpan.addEventListener('blur', () => {
+            if (editSpan.contentEditable === 'true') confirmEdit(editSpan, index);
+        });
+
         row.appendChild(editSpan);
+
+        const actions = document.createElement('div');
+        actions.className = 'note-actions';
+
+        const insertBtn = document.createElement('button');
+        insertBtn.textContent = '+';
+        insertBtn.title = 'Insert row after';
+        insertBtn.addEventListener('click', () => {
+            snapshot();
+            noteTexts.splice(index + 1, 0, '');
+            rebuildPages(notesPerPage);
+            // enter edit mode on the new row after rebuild
+            setTimeout(() => {
+                const spans = document.querySelectorAll('.note-text');
+                if (spans[index + 1]) setEditing(spans[index + 1], index + 1, true);
+            }, 0);
+        });
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '×';
+        deleteBtn.title = 'Delete row';
+        deleteBtn.addEventListener('click', () => {
+            snapshot();
+            noteTexts.splice(index, 1);
+            rebuildPages(notesPerPage);
+        });
+
+        actions.appendChild(insertBtn);
+        actions.appendChild(deleteBtn);
+        row.appendChild(actions);
         return row;
     }
 
@@ -349,20 +438,20 @@
 
     function buildPrintPages() {
         printout.innerHTML = '';
-        const totalPages = Math.ceil(noteTexts.length / NOTES_PER_PAGE);
-        for (let i = 0; i < noteTexts.length; i += NOTES_PER_PAGE) {
+        const totalPages = Math.ceil(noteTexts.length / notesPerPage);
+        for (let i = 0; i < noteTexts.length; i += notesPerPage) {
             const pp = document.createElement('div');
             pp.className = 'print-page';
 
             const ph = document.createElement('div');
             ph.className = 'print-header';
-            ph.innerHTML = `<span>${titleText}</span><span>Page ${Math.floor(i/NOTES_PER_PAGE)+1} / ${totalPages}</span>`;
+            ph.innerHTML = `<span>${titleText}</span><span>Page ${Math.floor(i/notesPerPage)+1} / ${totalPages}</span>`;
             pp.appendChild(ph);
 
             const pn = document.createElement('div');
             pn.className = 'print-notes';
 
-            noteTexts.slice(i, i + NOTES_PER_PAGE).forEach((text, j) => {
+            noteTexts.slice(i, i + notesPerPage).forEach((text, j) => {
                 const row = document.createElement('div');
                 row.className = 'print-note';
                 const num = document.createElement('span');
@@ -379,6 +468,71 @@
     }
 
     window.addEventListener('beforeprint', buildPrintPages);
+
+    // ── Undo stack ───────────────────────────────────────────────────────────
+    const undoStack = [];
+
+    function snapshot() {
+        undoStack.push([...noteTexts]);
+    }
+
+    function undo() {
+        if (!undoStack.length) return;
+        const prev = undoStack.pop();
+        noteTexts.length = 0;
+        prev.forEach(t => noteTexts.push(t));
+        rebuildPages(notesPerPage);
+    }
+
+    document.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+            // Only intercept when no cell is actively being edited
+            const editing = document.querySelector('.note-text[contenteditable="true"]');
+            if (!editing) { e.preventDefault(); undo(); }
+        }
+    });
+
+    // ── Notes-per-page ───────────────────────────────────────────────────────
+    let notesPerPage = NOTES_PER_PAGE;
+
+    function rebuildPages(n) {
+        if (!n || n < 1) return;
+        notesPerPage = n;
+        stage.innerHTML = '';
+        pages.length = 0;
+        for (let i = 0; i < noteTexts.length; i += notesPerPage) {
+            const page = document.createElement('div');
+            page.className = 'page';
+            noteTexts.slice(i, i + notesPerPage).forEach((text, j) => page.appendChild(buildNote(i + j, text)));
+            stage.appendChild(page);
+            pages.push(page);
+        }
+        current = 0;
+        showPage(0);
+    }
+
+    // ── Accent colour picker ─────────────────────────────────────────────────
+    function setAccent(color) {
+        document.documentElement.style.setProperty('--accent', color);
+    }
+
+    // ── Save ─────────────────────────────────────────────────────────────────
+    function saveHTML() {
+        // Flush all noteTexts back into the stage placeholders before serialising
+        document.querySelectorAll('.note-text').forEach((el, i) => {
+            el.innerHTML = '';
+            el.appendChild(highlightText(noteTexts[i]));
+            el.contentEditable = 'false';
+        });
+
+        const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        const blob = new Blob([html], { type: 'text/html' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'pacenotes.html';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
 </script>
 </body>
 </html>
