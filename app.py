@@ -14,6 +14,7 @@ from corecce import (
     save_info,
     save_pacenotes_txt,
     save_pacenotes_to_html,
+    _get_shorthand_list,
 )
 
 app = Flask(__name__)
@@ -30,8 +31,10 @@ def _set(job_id, message, status="running", result_url=None):
     jobs[job_id] = {"status": status, "message": message, "result_url": result_url}
 
 
-def run_youtube(job_id, url):
+def run_youtube(job_id, url, csv_path=None):
     try:
+        shorthand_list = _get_shorthand_list(csv_path)
+
         _set(job_id, "Fetching video info...")
         title = get_youtube_title(url)
         output_dir = os.path.join("outputs", title)
@@ -41,14 +44,14 @@ def run_youtube(job_id, url):
         _set(job_id, "Downloading audio...")
         audio_file = download_youtube_audio(url, output_dir)
 
-        _set(job_id, "Transcribing the Co Driver (this may take a few minutes)...")
+        _set(job_id, "Transcribing the Co Driver \n(this may take a few minutes)...")
         transcription = transcribe_and_diarize(audio_file)
         save_transcription(transcription, output_dir)
 
         _set(job_id, "Generating pace notes...")
-        pace_notes = translate_to_pacenotes(transcription)
+        pace_notes = translate_to_pacenotes(transcription, shorthand_list=shorthand_list)
         save_pacenotes_txt(pace_notes, output_dir)
-        save_pacenotes_to_html(title, pace_notes, output_dir, source=url)
+        save_pacenotes_to_html(title, pace_notes, output_dir, source=url, shorthand_list=shorthand_list)
 
         _set(job_id, "Done!", status="done", result_url=f"/outputs/{title}/pacenotes.html")
     except Exception as e:
@@ -56,8 +59,10 @@ def run_youtube(job_id, url):
         _set(job_id, str(e), status="error")
 
 
-def run_local_video(job_id, video_path, title):
+def run_local_video(job_id, video_path, title, csv_path=None):
     try:
+        shorthand_list = _get_shorthand_list(csv_path)
+
         output_dir = os.path.join("outputs", title)
         os.makedirs(output_dir, exist_ok=True)
         save_info(output_dir, title, source=os.path.abspath(video_path))
@@ -65,14 +70,14 @@ def run_local_video(job_id, video_path, title):
         _set(job_id, "Extracting audio...")
         audio_file = extract_local_audio(video_path, output_dir)
 
-        _set(job_id, "Transcribing the Co Driver (this may take a few minutes)...")
+        _set(job_id, "Transcribing the Co Driver \n(this may take a few minutes)...")
         transcription = transcribe_and_diarize(audio_file)
         save_transcription(transcription, output_dir)
 
         _set(job_id, "Generating pace notes...")
-        pace_notes = translate_to_pacenotes(transcription)
+        pace_notes = translate_to_pacenotes(transcription, shorthand_list=shorthand_list)
         save_pacenotes_txt(pace_notes, output_dir)
-        save_pacenotes_to_html(title, pace_notes, output_dir)
+        save_pacenotes_to_html(title, pace_notes, output_dir, shorthand_list=shorthand_list)
 
         _set(job_id, "Done!", status="done", result_url=f"/outputs/{title}/pacenotes.html")
     except Exception as e:
@@ -80,8 +85,10 @@ def run_local_video(job_id, video_path, title):
         _set(job_id, str(e), status="error")
 
 
-def run_transcription_file(job_id, transcription_path, title):
+def run_transcription_file(job_id, transcription_path, title, csv_path=None):
     try:
+        shorthand_list = _get_shorthand_list(csv_path)
+
         output_dir = os.path.join("outputs", title)
         os.makedirs(output_dir, exist_ok=True)
 
@@ -90,9 +97,9 @@ def run_transcription_file(job_id, transcription_path, title):
             transcription = f.read()
 
         _set(job_id, "Generating pace notes...")
-        pace_notes = translate_to_pacenotes(transcription)
+        pace_notes = translate_to_pacenotes(transcription, shorthand_list=shorthand_list)
         save_pacenotes_txt(pace_notes, output_dir)
-        save_pacenotes_to_html(title, pace_notes, output_dir)
+        save_pacenotes_to_html(title, pace_notes, output_dir, shorthand_list=shorthand_list)
 
         _set(job_id, "Done!", status="done", result_url=f"/outputs/{title}/pacenotes.html")
     except Exception as e:
@@ -100,8 +107,10 @@ def run_transcription_file(job_id, transcription_path, title):
         _set(job_id, str(e), status="error")
 
 
-def run_rerender(job_id, pacenotes_path, title):
+def run_rerender(job_id, pacenotes_path, title, csv_path=None):
     try:
+        shorthand_list = _get_shorthand_list(csv_path)
+
         output_dir = os.path.join("outputs", title)
         os.makedirs(output_dir, exist_ok=True)
 
@@ -117,7 +126,7 @@ def run_rerender(job_id, pacenotes_path, title):
                     source = line.split(":", 1)[1].strip()
 
         _set(job_id, "Rendering HTML...")
-        save_pacenotes_to_html(title, pace_notes, output_dir, source=source)
+        save_pacenotes_to_html(title, pace_notes, output_dir, source=source, shorthand_list=shorthand_list)
 
         _set(job_id, "Done!", status="done", result_url=f"/outputs/{title}/pacenotes.html")
     except Exception as e:
@@ -136,11 +145,19 @@ def process():
     job_id = str(uuid.uuid4())
     _set(job_id, "Starting...")
 
+    # Optional CSV upload — saved to disk so the background thread can read it
+    csv_path = None
+    csv_file = request.files.get("csv")
+    if csv_file and csv_file.filename:
+        csv_save_path = os.path.join(UPLOAD_DIR, f"{job_id}_shorthand.csv")
+        csv_file.save(csv_save_path)
+        csv_path = csv_save_path
+
     if mode == "youtube":
         url = request.form.get("url", "").strip()
         if not url:
             return jsonify({"error": "No URL provided"}), 400
-        threading.Thread(target=run_youtube, args=(job_id, url), daemon=True).start()
+        threading.Thread(target=run_youtube, args=(job_id, url, csv_path), daemon=True).start()
 
     elif mode == "local":
         f = request.files.get("file")
@@ -149,7 +166,7 @@ def process():
         title = os.path.splitext(f.filename)[0]
         save_path = os.path.join(UPLOAD_DIR, f.filename)
         f.save(save_path)
-        threading.Thread(target=run_local_video, args=(job_id, save_path, title), daemon=True).start()
+        threading.Thread(target=run_local_video, args=(job_id, save_path, title, csv_path), daemon=True).start()
 
     elif mode == "transcription":
         f = request.files.get("file")
@@ -158,7 +175,7 @@ def process():
         title = request.form.get("title", "").strip() or os.path.splitext(f.filename)[0]
         save_path = os.path.join(UPLOAD_DIR, f.filename)
         f.save(save_path)
-        threading.Thread(target=run_transcription_file, args=(job_id, save_path, title), daemon=True).start()
+        threading.Thread(target=run_transcription_file, args=(job_id, save_path, title, csv_path), daemon=True).start()
 
     elif mode == "rerender":
         f = request.files.get("file")
@@ -167,7 +184,7 @@ def process():
         title = request.form.get("title", "").strip() or os.path.splitext(f.filename)[0].replace("_pacenotes", "")
         save_path = os.path.join(UPLOAD_DIR, f.filename)
         f.save(save_path)
-        threading.Thread(target=run_rerender, args=(job_id, save_path, title), daemon=True).start()
+        threading.Thread(target=run_rerender, args=(job_id, save_path, title, csv_path), daemon=True).start()
 
     else:
         return jsonify({"error": "Unknown mode"}), 400

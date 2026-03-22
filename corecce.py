@@ -1,5 +1,7 @@
+import csv
 import logging
 import os
+import re
 import subprocess
 import argparse
 from collections import defaultdict
@@ -24,7 +26,91 @@ genai_client = genai.Client()
 
 GEMINI_MODEL = 'gemini-2.5-flash'
 PROMPT_PATH = "pacenotes_transcription_prompt.md"
+DEFAULT_CSV_PATH = "pacenotes_shorthand.csv"
 
+# JS regex special characters that need escaping
+_JS_REGEX_SPECIAL = set(r'\^$.|?*+()[]{/')
+
+
+def _escape_for_js_regex(s):
+    result = []
+    for ch in s:
+        if ch in _JS_REGEX_SPECIAL:
+            result.append('\\' + ch)
+        else:
+            result.append(ch)
+    return ''.join(result)
+
+
+def _shorthand_to_js_pattern(shorthand):
+    escaped = _escape_for_js_regex(shorthand)
+    if re.match(r'^\w+$', shorthand):
+        return f'/\\b{escaped}\\b/gi'
+    return f'/{escaped}/g'
+
+
+def load_shorthand_csv(csv_path):
+    """
+    Load a shorthand CSV with columns: Note, Shorthand, Severity.
+    Returns a list of dicts with keys: note, shorthand, severity (int or None).
+    Skips blank or malformed rows.
+    """
+    if not csv_path or not os.path.exists(csv_path):
+        return []
+    rows = []
+    with open(csv_path, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            note = row.get('Note', '').strip()
+            shorthand = row.get('Shorthand', '').strip()
+            severity_raw = row.get('Severity', '').strip()
+            if not note or not shorthand:
+                continue
+            try:
+                severity = int(severity_raw) if severity_raw else None
+            except ValueError:
+                severity = None
+            rows.append({'note': note, 'shorthand': shorthand, 'severity': severity})
+    logging.info(f"Loaded {len(rows)} shorthand entries from {csv_path}")
+    return rows
+
+
+def _get_shorthand_list(csv_path=None):
+    """Load from the given path, or fall back to the default CSV if it exists."""
+    path = csv_path if csv_path and os.path.exists(csv_path) else DEFAULT_CSV_PATH
+    return load_shorthand_csv(path)
+
+
+def _build_shorthand_prompt_table(shorthand_list):
+    """Render shorthand_list as a markdown table for injection into the prompt."""
+    if not shorthand_list:
+        return "(no custom shorthand list provided — use built-in mappings only)"
+    lines = ["| Note | Shorthand |", "|------|-----------|"]
+    for entry in shorthand_list:
+        lines.append(f"| {entry['note']} | {entry['shorthand']} |")
+    return "\n".join(lines)
+
+
+def _build_csv_highlights_js(shorthand_list):
+    """
+    Generate JS highlight entries for all CSV rows that have a severity.
+    Deduplicates by (shorthand, severity). Returns a string of JS lines
+    to replace the // {{CSV_HIGHLIGHTS}} placeholder.
+    """
+    seen = set()
+    lines = []
+    for entry in shorthand_list:
+        sev = entry['severity']
+        if sev not in (1, 2, 3):
+            continue
+        shorthand = entry['shorthand']
+        key = (shorthand, sev)
+        if key in seen:
+            continue
+        seen.add(key)
+        pattern = _shorthand_to_js_pattern(shorthand)
+        lines.append(f"        {{ pattern: {pattern}, cls: 'sev-{sev}' }},")
+    return "\n".join(lines)
 
 
 def get_youtube_title(url):
@@ -38,7 +124,6 @@ def get_youtube_title(url):
 
 
 def download_youtube_audio(url, output_dir):
-    sanitized_title = os.path.basename(output_dir)
     audio_path = os.path.join(output_dir, "audio.wav")
     cmd = [
         "yt-dlp",
@@ -129,11 +214,16 @@ def transcribe_and_diarize(audio_path):
     return "\n".join(lines)
 
 
-def translate_to_pacenotes(codriver_transcription):
+def translate_to_pacenotes(codriver_transcription, shorthand_list=None):
     if not os.path.exists(PROMPT_PATH):
         raise FileNotFoundError(f"Prompt file not found: {PROMPT_PATH}")
     with open(PROMPT_PATH, "r") as f:
-        prompt = f.read().replace("{{TRANSCRIPTION}}", codriver_transcription)
+        prompt = f.read()
+
+    shorthand_table = _build_shorthand_prompt_table(shorthand_list or [])
+    prompt = prompt.replace("{{SHORTHAND_CSV}}", shorthand_table)
+    prompt = prompt.replace("{{TRANSCRIPTION}}", codriver_transcription)
+
     logging.info("Sending to Gemini for pace note conversion...")
     response = genai_client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
     return response.text.strip()
@@ -163,7 +253,8 @@ def save_pacenotes_txt(pace_notes, output_dir):
     return output_path
 
 
-def save_pacenotes_to_html(title, pace_notes, output_dir, source=None, template_path="template.html"):
+def save_pacenotes_to_html(title, pace_notes, output_dir, source=None, shorthand_list=None,
+                           template_path="template.html"):
     output_filename = os.path.join(output_dir, "pacenotes.html")
     with open(template_path, "r") as f:
         html_content = f.read()
@@ -175,6 +266,10 @@ def save_pacenotes_to_html(title, pace_notes, output_dir, source=None, template_
     else:
         yt_link = ""
     html_content = html_content.replace("<!--YOUTUBE_LINK_PLACEHOLDER-->", yt_link)
+
+    # Inject severity highlight patterns from the CSV
+    highlights_js = _build_csv_highlights_js(shorthand_list or [])
+    html_content = html_content.replace("        // {{CSV_HIGHLIGHTS}}", highlights_js)
 
     notes_html = ''.join(
         f'<div class="pacenote">{note}</div>'
@@ -195,7 +290,10 @@ def main():
     group.add_argument("--path", "-p", help="Local video file path")
     group.add_argument("--transcription-file", "-tf", help="Existing co-driver transcription file")
     group.add_argument("--rerender", "-rr", help="Re-render HTML from an existing _pacenotes.txt file")
+    parser.add_argument("--shorthand-csv", "-sc", help="Path to shorthand CSV (Note, Shorthand, Severity)")
     args = parser.parse_args()
+
+    shorthand_list = _get_shorthand_list(args.shorthand_csv)
 
     # ── Re-render shortcut ───────────────────────────────────────────────────
     if args.rerender:
@@ -213,7 +311,7 @@ def main():
             for line in open(info_path):
                 if line.startswith("source:"):
                     source = line.split(":", 1)[1].strip()
-        save_pacenotes_to_html(title, pace_notes, output_dir, source=source)
+        save_pacenotes_to_html(title, pace_notes, output_dir, source=source, shorthand_list=shorthand_list)
         return
 
     # ── Full pipeline ────────────────────────────────────────────────────────
@@ -261,10 +359,9 @@ def main():
         logging.warning("Transcription is empty — nothing to generate.")
         return
 
-    pace_notes = translate_to_pacenotes(transcription)
-    logging.info("--- PACE NOTES ---\n" + pace_notes)
+    pace_notes = translate_to_pacenotes(transcription, shorthand_list=shorthand_list)
     save_pacenotes_txt(pace_notes, output_dir)
-    save_pacenotes_to_html(title, pace_notes, output_dir, source=source)
+    save_pacenotes_to_html(title, pace_notes, output_dir, source=source, shorthand_list=shorthand_list)
 
 
 if __name__ == "__main__":

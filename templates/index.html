@@ -319,6 +319,16 @@
 
 </div>
 
+<!-- ── Shorthand CSV (shared, outside card) ───────────── -->
+<div id="csv-section" style="width:100%;max-width:580px;margin-top:1rem">
+    <label style="margin-top:0">Shorthand CSV <span style="color:var(--muted);text-transform:none">(optional — overrides default)</span></label>
+    <div class="file-area" id="csv-area" style="padding:0.75rem 1.5rem">
+        <input type="file" accept=".csv,text/csv" onchange="csvChosen(this)">
+        <div class="file-label" style="font-size:0.75rem">Click to browse — <span>select shorthand.csv</span></div>
+        <div class="file-name" id="csv-name"></div>
+    </div>
+</div>
+
 <script>
     // ── Tab switching ────────────────────────────────
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -341,10 +351,22 @@
         document.getElementById(nameId).textContent = file.name;
     }
 
+    // ── CSV chooser ──────────────────────────────────
+    let csvFile = null;
+
+    function csvChosen(input) {
+        const file = input.files[0];
+        if (!file) return;
+        csvFile = file;
+        document.getElementById('csv-area').classList.add('has-file');
+        document.getElementById('csv-name').textContent = file.name;
+    }
+
     // ── Submit ───────────────────────────────────────
     function submit(mode) {
         const formData = new FormData();
         formData.append('mode', mode);
+        if (csvFile) formData.append('csv', csvFile);
 
         if (mode === 'youtube') {
             const url = document.getElementById('yt-url').value.trim();
@@ -402,6 +424,7 @@
     function showProgress() {
         document.getElementById('tabs').style.display = 'none';
         document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+        document.getElementById('csv-section').style.display = 'none';
         document.getElementById('progress-view').style.display = 'flex';
     }
 
@@ -437,6 +460,7 @@
     function restart() {
         document.getElementById('tabs').style.display = 'flex';
         document.querySelectorAll('.tab-panel').forEach(p => p.style.display = '');
+        document.getElementById('csv-section').style.display = '';
         document.querySelector('.tab-btn.active').click();
         document.getElementById('progress-view').style.display = 'none';
         document.querySelector('.spinner').style.display = 'block';

@@ -68,7 +68,7 @@ Open `http://localhost:5000` in your browser. Four modes are available:
 | Transcription File | Existing `transcription.txt` | Pace notes HTML |
 | Re-render | Existing `pacenotes.txt` | Re-rendered HTML |
 
-The transcription + LLM step typically takes **2–5 minutes** depending on video length. Progress is shown in real time.
+All processing tabs include an optional **Shorthand CSV** file picker (see below). The transcription + LLM step typically takes **2–5 minutes** depending on video length. Progress is shown in real time.
 
 ### Command line
 
@@ -84,7 +84,61 @@ python corecce.py --transcription-file outputs/MyStage/transcription.txt
 
 # Re-render HTML from existing pace notes
 python corecce.py --rerender outputs/MyStage/pacenotes.txt
+
+# With a custom shorthand CSV
+python corecce.py --link "..." --shorthand-csv my_shorthand.csv
 ```
+
+---
+
+## Shorthand CSV
+
+CoRecce uses a CSV file to define the shorthand vocabulary and severity highlighting. The default file is `pacenotes_shorthand.csv` in the project root and is loaded automatically on every run.
+
+### Format
+
+The CSV must have exactly these three columns:
+
+| Column | Description |
+|--------|-------------|
+| `Note` | The spoken word or phrase (e.g. `caution`, `off camber`) |
+| `Shorthand` | The shorthand to output (e.g. `!`, `Offc`) |
+| `Severity` | `1`, `2`, `3`, or blank — controls highlight colour in the viewer |
+
+Example:
+
+```csv
+Note,Shorthand,Severity
+Caution,!,1
+Dont,Dont,2
+Care,Care,2
+Tightens,>,3
+Jump,Jmp,3
+Slippy,$,2
+```
+
+### Severity colours
+
+| Severity | Colour | Use for |
+|----------|--------|---------|
+| 1 | Bright red | High danger (caution, don't cut) |
+| 2 | Orange | Moderate warnings (care, slippy, narrow) |
+| 3 | Peach | Attention notes (tightens, brake, jump) |
+| *(blank)* | No highlight | Neutral shorthand (kinks, crest, etc.) |
+
+### Casing convention (small-caps rendering)
+
+The viewer renders all note text in **small-caps**, so letter case in your shorthand values controls visual size:
+
+- **First letter uppercase, rest lowercase** → first letter is a large cap, rest are small caps (e.g. `Care`, `Dont`, `Decept`)
+- **All uppercase** → all letters appear as full large caps (e.g. `HP`, `IN`)
+
+### Using a custom CSV
+
+- **Web app:** use the "Shorthand CSV (optional)" file picker on any processing tab to upload a CSV that overrides the default for that run.
+- **CLI:** pass `--shorthand-csv /path/to/my.csv`
+
+The list is **definitive**: every term found in the `Note` column is translated to its `Shorthand`. Terms not in the list are kept as transcribed, unless they match a known homophone or transcription error.
 
 ---
 
@@ -120,11 +174,25 @@ CoRecce uses standard international rally shorthand conventions:
 | `K` | Kink |
 | `H` | Hairpin |
 | `!` | Caution |
-| `CARE` | Take care |
-| `DONT` | Do not cut |
+| `Care` | Take care |
+| `Dont` | Do not cut |
 | `m` | Metres (distance marker) |
 
-The LLM prompt is tuned for rally-specific homophones and common transcription errors (e.g. "too" → `2`, "tightens" → `>`).
+### Line grouping
+
+Notes are grouped onto lines following these rules:
+
+- Maximum **3** corners per line when all are plain
+- Maximum **2** corners per line when any has a modifier (`>`, `<`, short, slippy, sharp, etc.)
+- Distance numbers (30, 50, 75, 100…) appear at the **end** of the line they belong to, signalling how far to the next call:
+
+```
+R5 / Cr
+4L >  30
+R2
+L5 R6 L6
+! Dont
+```
 
 ---
 
@@ -132,8 +200,9 @@ The LLM prompt is tuned for rally-specific homophones and common transcription e
 
 - **Video quality matters.** Onboards with a clear co-driver microphone (not just cabin audio) produce significantly better transcriptions.
 - **Review the transcription first.** Open `transcription.txt` after the transcription step — if the co-driver wasn't correctly isolated, you can manually clean it and use the *Transcription File* tab to regenerate pace notes without re-transcribing.
-- **Use Re-render freely.** If you tweak `pacenotes.txt` by hand, use Re-render to regenerate the HTML without any API calls.
+- **Use Re-render freely.** If you tweak `pacenotes.txt` by hand, use Re-render to regenerate the HTML without any API calls. Your shorthand CSV will be re-applied.
 - **Edit in the viewer.** The HTML viewer is fully editable — double-click any note to fix it on the fly, then hit Save to download the updated file.
+- **Tune your CSV.** Edit `pacenotes_shorthand.csv` to match your co-driver's vocabulary. The CSV is the single source of truth for what gets translated and how it's highlighted.
 
 ---
 

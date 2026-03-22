@@ -70,7 +70,6 @@
         /* ── Page stage ─────────────────────────────────────── */
         #stage {
             position: relative;
-            /* fills viewport minus header and hint */
             height: calc(100vh - 48px - 28px);
         }
 
@@ -78,18 +77,16 @@
             display: none;
             position: absolute;
             inset: 0;
-            /* center notes column */
             flex-direction: column;
             justify-content: space-evenly;
-            align-items: center;
-            padding: 2.5rem 2rem;
+            align-items: flex-start;
+            padding: 2.5rem 2rem 2.5rem 5vw;
         }
 
         .page.active { display: flex; }
 
         .pacenote {
-            width: 100%;
-            max-width: 640px;
+            width: min(65vw, 900px);
             font-size: 1.6rem;
             line-height: 1.4;
             display: flex;
@@ -97,8 +94,8 @@
             gap: 0.75rem;
             border-bottom: 1px solid var(--divider);
             padding-bottom: 0;
-            justify-content: center;
-            text-align: center;
+            justify-content: flex-start;
+            text-align: left;
         }
 
         .page .pacenote:last-child { border-bottom: none; }
@@ -117,6 +114,7 @@
             outline: none;
             border-radius: 2px;
             cursor: default;
+            font-variant: small-caps;
         }
 
         .note-text[contenteditable="true"] {
@@ -146,10 +144,10 @@
         }
         .note-actions button:hover { border-color: var(--accent); color: var(--accent); }
 
-        /* ── Danger highlighting ─────────────────────────────── */
-        .hl-caution { color: #ff3b3b; font-weight: bold; }
-        .hl-care    { color: #ff8c69; font-weight: bold; }
-        .hl-dont    { color: #ff3b3b; font-weight: bold; }
+        /* ── Severity highlighting ───────────────────────────── */
+        .sev-1 { color: #ff1a1a; font-weight: bold; }
+        .sev-2 { color: #ff8c00; font-weight: bold; }
+        .sev-3 { color: #ffc19a; font-weight: bold; }
 
         /* ── Hint bar ────────────────────────────────────────── */
         #hint {
@@ -159,6 +157,12 @@
             justify-content: center;
             font-size: 0.68rem;
             color: var(--muted);
+        }
+
+        /* ── Mobile ─────────────────────────────────────────── */
+        @media (max-width: 640px) {
+            .page { padding-left: 1rem; }
+            .pacenote { width: calc(100vw - 2rem); }
         }
 
         /* ── Print ──────────────────────────────────────────── */
@@ -198,6 +202,7 @@
                 display: flex;
                 gap: 8pt;
                 align-items: baseline;
+                font-variant: small-caps;
             }
             .print-note:last-child { border-bottom: none; }
 
@@ -209,9 +214,9 @@
                 flex-shrink: 0;
             }
 
-            .hl-caution { color: #cc0000; font-weight: bold; }
-            .hl-care    { color: #cc5500; font-weight: bold; }
-            .hl-dont    { color: #cc0000; font-weight: bold; }
+            .sev-1 { color: #cc0000; font-weight: bold; }
+            .sev-2 { color: #cc5500; font-weight: bold; }
+            .sev-3 { color: #cc8855; font-weight: bold; }
         }
     </style>
 </head>
@@ -246,13 +251,9 @@
 <script>
     const NOTES_PER_PAGE = 7;
 
-    // Words to highlight and their CSS class
+    // Severity highlight patterns — injected by Python from the shorthand CSV
     const HIGHLIGHTS = [
-        { pattern: /\bCAUTION\b/gi, cls: 'hl-caution' },
-        { pattern: /\bCARE\b/gi,    cls: 'hl-care'    },
-        { pattern: /\bDONT\b/gi,    cls: 'hl-dont'    },
-        { pattern: /!/g,            cls: 'hl-caution'  },
-        { pattern: />/g,            cls: 'hl-care'     },
+        // {{CSV_HIGHLIGHTS}}
     ];
 
     function highlightText(text) {

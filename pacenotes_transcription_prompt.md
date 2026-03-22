@@ -7,7 +7,7 @@ The following is a timestamped transcription of a rally onboard. It is primarily
 
 Your job is to extract ONLY the genuine pace note calls and convert them into clean ultra-concise rally pace note shorthand, one call per line. Discard anything that is not a pace note call.
 
-## Shorthand Mappings
+## Built-in Shorthand Mappings
 
 Apply these substitutions consistently:
 
@@ -29,27 +29,52 @@ Apply these substitutions consistently:
 | care | Care |
 | bumps | bump |
 
+## Custom Shorthand List
+
+The table below is DEFINITIVE. Every spoken term in the Note column MUST be converted to its Shorthand. Terms NOT present in this list (and not in the built-in table above) should be kept exactly as transcribed, unless they are clear homophones or transcription errors listed in the section below.
+
+{{SHORTHAND_CSV}}
+
 ## Rules
 
-- Output shorthand only no timestamps no prose
-- Direction R or L can appear before or after the severity number depending on how the co driver calls it - preserve their style
+- Output shorthand only — no timestamps, no prose
+- Direction R or L can appear before or after the severity number depending on how the co-driver calls it — preserve their style
 - Each distinct pace note call or group of consecutive corners is one line
-- Consecutive corners called together are written on one line separated by spaces eg L5 R6 L6 — do NOT use / between them
-- / means OVER a physical feature ONLY eg R5 / Cr means right 5 over crest — it is never a separator between corners
+- Consecutive corners called together are written on one line separated by spaces e.g. L5 R6 L6 — do NOT use / between them
+- / means OVER a physical feature ONLY e.g. R5 / Cr means right 5 over crest — it is never a separator between corners
 - No apostrophes or punctuation beyond / and basic symbols (! is caution)
-- Correct clear transcription errors using rally context eg Kings becomes Kinks becomes K
-- Distance markers eg 50 30 20 appear before the note they refer to
-- Always put a space between < or > and adjacent numbers or modifiers eg > 2+ not >2+ and < 3 not <3
+- Correct clear transcription errors using rally context e.g. Kings becomes Kinks becomes K
+- Always put a space between < or > and adjacent numbers or modifiers e.g. > 2+ not >2+ and < 3 not <3
+
+## Distances vs Corner Severity — Never Combine
+
+Numbers serve two completely different purposes and must never be merged:
+
+- **Corner severity** — always a single digit **1 through 10** (e.g. 1, 2, 3, … 8, 9, 10). These are attached to a direction: `R5`, `8L`, `L10`.
+- **Distance markers** — always a **round number greater than 10** (e.g. 30, 50, 75, 80, 100, 150, 200, 300…). These are never attached to a direction letter.
+
+If a call is "one hundred eight left", that is **distance 100** followed by **corner 8L** — output `8L` on a new line with `100` ending the prior line. It is **never** `108L`. Distance numbers and severity numbers are always separate tokens with a space between them. If you are unsure whether a number is a distance or a severity, apply this rule: any number greater than 10 is a distance.
+
+## Line Grouping Rules
+
+- Group consecutive corner calls onto a single line, subject to these limits:
+  - Maximum **3** corner calls per line when all corners are plain (no modifiers)
+  - Maximum **2** corner calls per line when any corner has a modifier: `>`, `<`, short, slippy, sharp, long, tightens, opens, or similar
+- Distance numbers (30, 50, 75, 80, 100, then increments of 50 up to 500, then 600–1000 in hundreds) go at the **END** of the line for the group that precedes them — NOT at the start of the next line
+  - They signal "next call in X m" and are placed after the last corner on the line, separated by two spaces
+  - e.g. `L4 >  50` means "left 4 tightens, then in 50 metres..."
+- Lines should end in a distance number wherever the co-driver called one
 
 ## Splitting calls within a single transcription line
 
 A single transcription line may contain multiple distinct calls that must each go on their own line.
 Split into a new line when any of these occur:
 
-- A new distance marker appears eg 55 hook L2 fast then 30 R4 becomes two lines
-- A natural pause is implied by the phrasing eg and then or then signals a new call
+- A new distance marker appears e.g. `55 hook L2 fast then 30 R4` becomes two lines
+- A natural pause is implied by the phrasing e.g. "and then" or "then" signals a new call
 - A direction change that represents a new independent corner or instruction
-- A warning word appears eg CAUTION or DONT that stands alone
+- A warning word appears e.g. CAUTION or DONT that stands alone
+- The grouping limit above would be exceeded
 
 When in doubt split rather than combine. It is better to have more lines than fewer.
 
@@ -67,12 +92,10 @@ The speech-to-text model frequently mishears rally calls. Always check for these
 | free / three | 3 |
 | fife / five | 5 |
 | niner / nine | 9 |
-| Kings / king | K (kink) |
-| Titans / tightens / tight | > |
-| opens up / opening | < |
+| Kings / king | kinks |
+| Titans  | tightens |
 | over | / |
 | medium | mid |
-| flat / very fast / very open | 6 or flat |
 | don't / dont cut / do not | Dont |
 | careful | Care |
 
@@ -88,7 +111,8 @@ Input:
 
 Output:
 R5 / Cr
-4L > into 30 R2
+4L >  30
+R2
 L5 R6 L6
 ! Dont
 
