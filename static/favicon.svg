@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="32" height="32">
+  <!-- Outer rim -->
+  <circle cx="50" cy="50" r="44" fill="none" stroke="#ff69b4" stroke-width="8"/>
+  <!-- Center hub -->
+  <circle cx="50" cy="50" r="10" fill="#ff69b4"/>
+  <!-- Spoke at 10 o'clock -->
+  <line x1="41" y1="45" x2="12" y2="28" stroke="#ff69b4" stroke-width="6" stroke-linecap="round"/>
+  <!-- Spoke at 2 o'clock -->
+  <line x1="59" y1="45" x2="88" y2="28" stroke="#ff69b4" stroke-width="6" stroke-linecap="round"/>
+  <!-- Spoke at 6 o'clock -->
+  <line x1="50" y1="60" x2="50" y2="94" stroke="#ff69b4" stroke-width="6" stroke-linecap="round"/>
+</svg>

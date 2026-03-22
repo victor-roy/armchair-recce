@@ -1,8 +1,8 @@
-# GoRally
+# CoRecce
 
 Turn rally onboard videos into printable, interactive pace notes — in minutes.
 
-GoRally takes a YouTube link or local video file, isolates the co-driver's calls using speaker diarization, and uses an LLM to convert them into clean rally shorthand. The result is an interactive HTML pace note viewer you can use on a tablet in the car, or print and cut for a real stage.
+CoRecce takes a YouTube link or local video file, isolates the co-driver's calls using speaker diarization, and uses an LLM to convert them into clean rally shorthand. The result is an interactive HTML pace note viewer you can use on a tablet in the car, or print and cut for a real stage.
 
 ---
 
@@ -35,8 +35,8 @@ The viewer supports:
 ## Setup
 
 ```bash
-git clone https://github.com/yourname/gorally.git
-cd gorally
+git clone https://github.com/yourname/corecce.git
+cd corecce
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -74,16 +74,16 @@ The transcription + LLM step typically takes **2–5 minutes** depending on vide
 
 ```bash
 # From a YouTube link
-python gorally.py --link "https://www.youtube.com/watch?v=..."
+python corecce.py --link "https://www.youtube.com/watch?v=..."
 
 # From a local video file
-python gorally.py --path "/path/to/video.mp4"
+python corecce.py --path "/path/to/video.mp4"
 
 # From an existing transcription
-python gorally.py --transcription-file outputs/MyStage/transcription.txt
+python corecce.py --transcription-file outputs/MyStage/transcription.txt
 
 # Re-render HTML from existing pace notes
-python gorally.py --rerender outputs/MyStage/pacenotes.txt
+python corecce.py --rerender outputs/MyStage/pacenotes.txt
 ```
 
 ---
@@ -106,7 +106,7 @@ outputs/
 
 ## Pace note shorthand
 
-GoRally uses standard international rally shorthand conventions:
+CoRecce uses standard international rally shorthand conventions:
 
 | Symbol | Meaning |
 |--------|---------|

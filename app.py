@@ -4,7 +4,7 @@ import threading
 import logging
 from flask import Flask, request, jsonify, render_template, send_from_directory
 
-from gorally import (
+from corecce import (
     get_youtube_title,
     download_youtube_audio,
     extract_local_audio,

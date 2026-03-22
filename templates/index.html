@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoRally</title>
+    <title>CoRecce</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -234,7 +235,7 @@
 <body>
 
 <header>
-    <h1>GORALLY</h1>
+    <h1>CORECCE</h1>
     <p>onboard video → printable pace notes</p>
 </header>
 
@@ -243,6 +244,7 @@
     <button class="tab-btn" data-tab="local">Local Video</button>
     <button class="tab-btn" data-tab="transcription">Transcription File</button>
     <button class="tab-btn" data-tab="rerender">Re-render</button>
+    <button class="tab-btn" data-tab="view">View Pace Notes</button>
 </div>
 
 <div class="card">
@@ -293,6 +295,17 @@
             <input type="text" id="rerender-title" placeholder="e.g. Overmountain SS3">
         </div>
         <button class="submit-btn" onclick="submit('rerender')">Re-render HTML</button>
+    </div>
+
+    <!-- ── View Pace Notes ─────────────────────────── -->
+    <div class="tab-panel" id="tab-view">
+        <label>Pace Notes HTML (pacenotes.html)</label>
+        <div class="file-area" id="view-area">
+            <input type="file" accept=".html,text/html" onchange="viewChosen(this)">
+            <div class="file-label">Click to browse — <span>select pacenotes.html</span></div>
+            <div class="file-name" id="view-name"></div>
+        </div>
+        <button class="submit-btn" id="view-open-btn" onclick="openView()" disabled>Open Pace Notes</button>
     </div>
 
     <!-- ── Progress ────────────────────────────────── -->
@@ -399,6 +412,26 @@
         err.textContent = msg;
         err.style.display = 'block';
         document.getElementById('restart-btn').style.display = 'block';
+    }
+
+    // ── View Pace Notes ──────────────────────────────
+    let viewFile = null;
+    let viewObjectURL = null;
+
+    function viewChosen(input) {
+        const file = input.files[0];
+        if (!file) return;
+        viewFile = file;
+        document.getElementById('view-area').classList.add('has-file');
+        document.getElementById('view-name').textContent = file.name;
+        document.getElementById('view-open-btn').disabled = false;
+    }
+
+    function openView() {
+        if (!viewFile) return;
+        if (viewObjectURL) URL.revokeObjectURL(viewObjectURL);
+        viewObjectURL = URL.createObjectURL(viewFile);
+        window.open(viewObjectURL, '_blank');
     }
 
     function restart() {
