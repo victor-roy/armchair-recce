@@ -137,8 +137,8 @@
             border: 1px solid var(--muted);
             color: var(--muted);
             font-family: inherit;
-            font-size: 0.7rem;
-            padding: 0.1rem 0.35rem;
+            font-size: 0.95rem;
+            padding: 0.2rem 0.5rem;
             cursor: pointer;
             line-height: 1;
         }
@@ -148,6 +148,9 @@
         .sev-1 { color: #ff1a1a; font-weight: bold; }
         .sev-2 { color: #ff8c00; font-weight: bold; }
         .sev-3 { color: #ffc19a; font-weight: bold; }
+
+        /* ── Uncertain terms ─────────────────────────────────── */
+        .uncertain { background: rgba(255, 210, 0, 0.25); color: #ffd700; font-style: italic; }
 
         /* ── Hint bar ────────────────────────────────────────── */
         #hint {
@@ -217,6 +220,7 @@
             .sev-1 { color: #cc0000; font-weight: bold; }
             .sev-2 { color: #cc5500; font-weight: bold; }
             .sev-3 { color: #cc8855; font-weight: bold; }
+            .uncertain { background: #fffacc; color: #887700; font-style: italic; }
         }
     </style>
 </head>
@@ -253,6 +257,7 @@
 
     // Severity highlight patterns — injected by Python from the shorthand CSV
     const HIGHLIGHTS = [
+        { pattern: /\[\?[^\]]*\]/g, cls: 'uncertain' },
         // {{CSV_HIGHLIGHTS}}
     ];
 
@@ -315,6 +320,12 @@
 
     function confirmEdit(editSpan, index) {
         const updated = editSpan.textContent.trim();
+        if (updated === '') {
+            snapshot();
+            noteTexts.splice(index, 1);
+            rebuildPages(notesPerPage);
+            return;
+        }
         if (updated === noteTexts[index]) { setEditing(editSpan, index, false); return; }
         snapshot();
         noteTexts[index] = updated;
@@ -346,7 +357,9 @@
         editSpan.spellcheck = false;
         editSpan.appendChild(highlightText(text));
 
-        editSpan.addEventListener('dblclick', () => setEditing(editSpan, index, true));
+        editSpan.addEventListener('dblclick', () => {
+            if (editSpan.contentEditable !== 'true') setEditing(editSpan, index, true);
+        });
 
         editSpan.addEventListener('keydown', e => {
             if (editSpan.contentEditable !== 'true') return;
@@ -382,6 +395,7 @@
         deleteBtn.textContent = '×';
         deleteBtn.title = 'Delete row';
         deleteBtn.addEventListener('click', () => {
+            if (!confirm('Delete this note?')) return;
             snapshot();
             noteTexts.splice(index, 1);
             rebuildPages(notesPerPage);
@@ -421,6 +435,7 @@
     function changePage(dir) { showPage(current + dir); }
 
     document.addEventListener('keydown', e => {
+        if (document.querySelector('.note-text[contenteditable="true"]')) return;
         if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); changePage(1); }
         if (e.key === 'ArrowUp'   || e.key === 'ArrowLeft'  || e.key === 'PageUp')   { e.preventDefault(); changePage(-1); }
     });

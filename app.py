@@ -70,7 +70,7 @@ def run_local_video(job_id, video_path, title, csv_path=None):
         _set(job_id, "Extracting audio...")
         audio_file = extract_local_audio(video_path, output_dir)
 
-        _set(job_id, "Transcribing the Co Driver \n(this may take a few minutes)...")
+        _set(job_id, "Transcribing the Co Driver (this may take a few minutes)...")
         transcription = transcribe_and_diarize(audio_file)
         save_transcription(transcription, output_dir)
 

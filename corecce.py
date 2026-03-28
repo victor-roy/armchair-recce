@@ -4,7 +4,6 @@ import os
 import re
 import subprocess
 import argparse
-from collections import defaultdict
 
 import assemblyai as aai
 import yt_dlp
@@ -154,47 +153,32 @@ def extract_local_audio(video_path, output_dir):
 
 def transcribe_and_diarize(audio_path):
     """
-    Upload audio to AssemblyAI, transcribe with speaker diarization,
-    then return only the co-driver's utterances (dominant speaker by time).
+    Upload audio to AssemblyAI and transcribe without speaker filtering.
+    All speech is included — the LLM prompt filters out non-pacenote content.
     """
     logging.info("Uploading audio to AssemblyAI...")
     config = aai.TranscriptionConfig(
         speech_models=["universal-2"],
-        speaker_labels=True,
-        speakers_expected=2,
         punctuate=True,
         format_text=True,
     )
 
     transcriber = aai.Transcriber()
-    logging.info("Transcribing with speaker diarization (this runs in the cloud)...")
+    logging.info("Transcribing (this runs in the cloud)...")
     transcript = transcriber.transcribe(audio_path, config=config)
 
     if transcript.status == aai.TranscriptStatus.error:
         raise RuntimeError(f"AssemblyAI transcription failed: {transcript.error}")
 
-    # Tally speaking time per speaker using word-level data
-    speaker_times = defaultdict(float)
-    for word in transcript.words:
-        if word.speaker:
-            speaker_times[word.speaker] += (word.end - word.start)
-
-    logging.info("Speaker breakdown:")
-    for speaker, ms in sorted(speaker_times.items(), key=lambda x: -x[1]):
-        logging.info(f"  Speaker {speaker}: {ms/1000:.1f}s")
-
-    codriver = max(speaker_times, key=speaker_times.get)
-    logging.info(f"Co-driver identified as: Speaker {codriver}")
-
-    # Group co-driver words into subtitle-level segments by pause threshold
+    # Group all words into segments by pause threshold
     PAUSE_THRESHOLD_MS = 400  # new segment when gap between words exceeds this
 
-    codriver_words = [w for w in transcript.words if w.speaker == codriver]
+    words = [w for w in transcript.words if w.text]
 
     lines = []
-    if codriver_words:
-        seg_words = [codriver_words[0]]
-        for word in codriver_words[1:]:
+    if words:
+        seg_words = [words[0]]
+        for word in words[1:]:
             gap = word.start - seg_words[-1].end
             if gap > PAUSE_THRESHOLD_MS:
                 start = seg_words[0].start / 1000
