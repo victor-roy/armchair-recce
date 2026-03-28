@@ -2,7 +2,10 @@ import os
 import uuid
 import threading
 import logging
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from functools import wraps
+from flask import Flask, request, jsonify, render_template, send_from_directory, session, redirect, url_for
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from corecce import (
     get_youtube_title,
@@ -15,10 +18,26 @@ from corecce import (
     save_pacenotes_txt,
     save_pacenotes_to_html,
     _get_shorthand_list,
+    QuotaError,
 )
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024 * 1024  # 4 GB upload limit
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-not-for-production")
+
+INVITE_CODE = os.environ.get("INVITE_CODE")  # None = gate disabled (local dev)
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "10 per hour")
+
+limiter = Limiter(get_remote_address, app=app, default_limits=[])
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if INVITE_CODE and not session.get("authenticated"):
+            return redirect(url_for("index"))
+        return f(*args, **kwargs)
+    return decorated
 
 UPLOAD_DIR = os.path.join("outputs", "temp", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -54,6 +73,8 @@ def run_youtube(job_id, url, csv_path=None):
         save_pacenotes_to_html(title, pace_notes, output_dir, source=url, shorthand_list=shorthand_list)
 
         _set(job_id, "Done!", status="done", result_url=f"/outputs/{title}/pacenotes.html")
+    except QuotaError as e:
+        _set(job_id, str(e), status="error")
     except Exception as e:
         logging.exception("Job %s failed", job_id)
         _set(job_id, str(e), status="error")
@@ -80,6 +101,8 @@ def run_local_video(job_id, video_path, title, csv_path=None):
         save_pacenotes_to_html(title, pace_notes, output_dir, shorthand_list=shorthand_list)
 
         _set(job_id, "Done!", status="done", result_url=f"/outputs/{title}/pacenotes.html")
+    except QuotaError as e:
+        _set(job_id, str(e), status="error")
     except Exception as e:
         logging.exception("Job %s failed", job_id)
         _set(job_id, str(e), status="error")
@@ -102,6 +125,8 @@ def run_transcription_file(job_id, transcription_path, title, csv_path=None):
         save_pacenotes_to_html(title, pace_notes, output_dir, shorthand_list=shorthand_list)
 
         _set(job_id, "Done!", status="done", result_url=f"/outputs/{title}/pacenotes.html")
+    except QuotaError as e:
+        _set(job_id, str(e), status="error")
     except Exception as e:
         logging.exception("Job %s failed", job_id)
         _set(job_id, str(e), status="error")
@@ -129,6 +154,8 @@ def run_rerender(job_id, pacenotes_path, title, csv_path=None):
         save_pacenotes_to_html(title, pace_notes, output_dir, source=source, shorthand_list=shorthand_list)
 
         _set(job_id, "Done!", status="done", result_url=f"/outputs/{title}/pacenotes.html")
+    except QuotaError as e:
+        _set(job_id, str(e), status="error")
     except Exception as e:
         logging.exception("Job %s failed", job_id)
         _set(job_id, str(e), status="error")
@@ -136,10 +163,21 @@ def run_rerender(job_id, pacenotes_path, title, csv_path=None):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", gate_enabled=bool(INVITE_CODE), authenticated=session.get("authenticated", False))
+
+
+@app.route("/auth", methods=["POST"])
+def auth():
+    code = request.form.get("invite_code", "").strip()
+    if INVITE_CODE and code == INVITE_CODE:
+        session["authenticated"] = True
+        return redirect(url_for("index"))
+    return render_template("index.html", gate_enabled=True, authenticated=False, auth_error=True)
 
 
 @app.route("/process", methods=["POST"])
+@login_required
+@limiter.limit(RATE_LIMIT)
 def process():
     mode = request.form.get("mode")
     job_id = str(uuid.uuid4())
@@ -201,6 +239,7 @@ def status(job_id):
 
 
 @app.route("/outputs/<path:filepath>")
+@login_required
 def serve_output(filepath):
     return send_from_directory("outputs", filepath)
 

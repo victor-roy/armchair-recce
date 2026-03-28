@@ -230,6 +230,44 @@
         }
 
         #restart-btn:hover { color: var(--text); }
+        /* ── Invite gate ──────────────────────────────── */
+        #gate {
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid var(--accent);
+            padding: 2.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        #gate h2 { color: var(--accent); font-size: 1.1rem; letter-spacing: 0.1em; }
+        #gate p { color: var(--muted); font-size: 0.8rem; }
+
+        #gate input[type="text"] {
+            width: 100%;
+            background: #1a1a1a;
+            border: 1px solid var(--muted);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.95rem;
+            padding: 0.5rem 0.75rem;
+        }
+        #gate input[type="text"]:focus { outline: 1px solid var(--accent); }
+
+        #gate button {
+            background: none;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            font-family: inherit;
+            font-size: 0.85rem;
+            padding: 0.45rem 1.2rem;
+            cursor: pointer;
+            align-self: flex-start;
+        }
+        #gate button:hover { background: var(--accent); color: var(--bg); }
+
+        .gate-error { color: #ff4444; font-size: 0.8rem; }
     </style>
 </head>
 <body>
@@ -238,6 +276,18 @@
     <h1>CORECCE</h1>
     <p>onboard video → printable pace notes</p>
 </header>
+
+{% if gate_enabled and not authenticated %}
+<div id="gate">
+    <h2>ACCESS CODE</h2>
+    <p>Enter your invite code to continue.</p>
+    <form method="POST" action="/auth">
+        <input type="text" name="invite_code" placeholder="invite code" autofocus autocomplete="off">
+        {% if auth_error %}<p class="gate-error" style="margin-top:0.5rem">Incorrect code — try again.</p>{% endif %}
+        <button type="submit" style="margin-top:0.75rem">Enter</button>
+    </form>
+</div>
+{% else %}
 
 <div class="tabs" id="tabs">
     <button class="tab-btn active" data-tab="youtube">YouTube Link</button>
@@ -470,6 +520,6 @@
     }
 </script>
 
-
+{% endif %}
 </body>
 </html>

@@ -5,6 +5,10 @@ import re
 import subprocess
 import argparse
 
+
+class QuotaError(RuntimeError):
+    """Raised when an external API quota or rate limit is exceeded."""
+
 import assemblyai as aai
 import yt_dlp
 from yt_dlp.utils import sanitize_filename
@@ -168,7 +172,10 @@ def transcribe_and_diarize(audio_path):
     transcript = transcriber.transcribe(audio_path, config=config)
 
     if transcript.status == aai.TranscriptStatus.error:
-        raise RuntimeError(f"AssemblyAI transcription failed: {transcript.error}")
+        msg = transcript.error or ""
+        if "rate limit" in msg.lower() or "quota" in msg.lower() or "limit exceeded" in msg.lower():
+            raise QuotaError("AssemblyAI transcription limit reached — please try again later.")
+        raise RuntimeError(f"AssemblyAI transcription failed: {msg}")
 
     # Group all words into segments by pause threshold
     PAUSE_THRESHOLD_MS = 400  # new segment when gap between words exceeds this
@@ -209,7 +216,14 @@ def translate_to_pacenotes(codriver_transcription, shorthand_list=None):
     prompt = prompt.replace("{{TRANSCRIPTION}}", codriver_transcription)
 
     logging.info("Sending to Gemini for pace note conversion...")
-    response = genai_client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+    try:
+        response = genai_client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+    except Exception as e:
+        name = type(e).__name__
+        msg = str(e).lower()
+        if "resourceexhausted" in name or "429" in msg or "quota" in msg or "rate limit" in msg:
+            raise QuotaError("Gemini API limit reached — please try again later.") from e
+        raise
     return response.text.strip()
 
 
