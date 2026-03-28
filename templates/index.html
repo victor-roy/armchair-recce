@@ -197,10 +197,25 @@
         }
 
         #error-msg {
-            color: #ff3b3b;
-            font-size: 0.85rem;
-            margin-top: 1rem;
             display: none;
+            margin-top: 1.2rem;
+            border: 1px solid #ff3b3b;
+            padding: 0.75rem 1rem;
+            font-size: 0.8rem;
+        }
+
+        #error-msg .error-label {
+            color: #ff3b3b;
+            font-weight: bold;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.4rem;
+        }
+
+        #error-msg .error-detail {
+            color: var(--text);
+            opacity: 0.75;
+            white-space: pre-wrap;
+            word-break: break-word;
         }
 
         .result-btn {
@@ -362,7 +377,10 @@
     <div id="progress-view">
         <div class="spinner"></div>
         <div id="status-msg">Starting...</div>
-        <div id="error-msg"></div>
+        <div id="error-msg">
+            <div class="error-label">ERROR</div>
+            <div class="error-detail" id="error-detail"></div>
+        </div>
         <a id="result-link" class="result-btn" href="#" target="_blank" style="display:none">Open Pace Notes ↗</a>
         <button id="restart-btn" onclick="restart()" style="display:none">← start over</button>
     </div>
@@ -480,10 +498,9 @@
 
     function showError(msg) {
         document.querySelector('.spinner').style.display = 'none';
-        document.getElementById('status-msg').textContent = 'Something went wrong.';
-        const err = document.getElementById('error-msg');
-        err.textContent = msg;
-        err.style.display = 'block';
+        document.getElementById('status-msg').textContent = '';
+        document.getElementById('error-detail').textContent = msg;
+        document.getElementById('error-msg').style.display = 'block';
         document.getElementById('restart-btn').style.display = 'block';
     }
 
@@ -516,6 +533,7 @@
         document.querySelector('.spinner').style.display = 'block';
         document.getElementById('result-link').style.display = 'none';
         document.getElementById('error-msg').style.display = 'none';
+        document.getElementById('error-detail').textContent = '';
         document.getElementById('restart-btn').style.display = 'none';
     }
 </script>

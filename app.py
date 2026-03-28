@@ -234,7 +234,7 @@ def process():
 def status(job_id):
     job = jobs.get(job_id)
     if not job:
-        return jsonify({"status": "error", "message": "Job not found"}), 404
+        return jsonify({"status": "error", "message": "Job not found — the server may have restarted mid-job. Please try again."}), 404
     return jsonify(job)
 
 

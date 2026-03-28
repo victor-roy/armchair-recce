@@ -158,7 +158,7 @@ def download_youtube_audio(url, output_dir):
     cmd = [
         "yt-dlp",
         "--force-ipv4",
-        "-f", "bestaudio/best",
+        "-f", "bestaudio/bestvideo/best",
         "-o", os.path.join(output_dir, "audio.%(ext)s"),
         "--extract-audio",
         "--audio-format", "wav",
