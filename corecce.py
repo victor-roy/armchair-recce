@@ -10,10 +10,9 @@ class QuotaError(RuntimeError):
     """Raised when an external API quota or rate limit is exceeded."""
 
 import assemblyai as aai
-import yt_dlp
-from yt_dlp.utils import sanitize_filename
 from google import genai
 from dotenv import load_dotenv
+from youtube import get_youtube_title, download_youtube_audio
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,27 +30,6 @@ GEMINI_MODEL = 'gemini-2.5-flash'
 PROMPT_PATH = "pacenotes_transcription_prompt.md"
 DEFAULT_CSV_PATH = "pacenotes_shorthand.csv"
 MAX_AUDIO_DURATION_SECONDS = 30 * 60  # 30 minutes
-
-# Write YouTube cookies to a temp file once at startup if env var is set
-_COOKIES_PATH = None
-_raw_cookies = os.environ.get("YOUTUBE_COOKIES", "").strip()
-if _raw_cookies:
-    import tempfile
-    _tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
-    _tmp.write(_raw_cookies)
-    _tmp.close()
-    _COOKIES_PATH = _tmp.name
-    logging.info(f"YouTube cookies loaded from YOUTUBE_COOKIES env var → {_COOKIES_PATH}")
-
-
-def _yt_cookies_args():
-    """Returns extra yt-dlp CLI args for cookie auth, if configured."""
-    return ["--cookies", _COOKIES_PATH] if _COOKIES_PATH else []
-
-
-def _yt_cookies_opts():
-    """Returns extra yt-dlp YoutubeDL options for cookie auth, if configured."""
-    return {"cookiefile": _COOKIES_PATH} if _COOKIES_PATH else {}
 
 # JS regex special characters that need escaping
 _JS_REGEX_SPECIAL = set(r'\^$.|?*+()[]{/')
@@ -136,40 +114,6 @@ def _build_csv_highlights_js(shorthand_list):
         pattern = _shorthand_to_js_pattern(shorthand)
         lines.append(f"        {{ pattern: {pattern}, cls: 'sev-{sev}' }},")
     return "\n".join(lines)
-
-
-def get_youtube_title(url):
-    logging.info(f"Fetching video info: {url}")
-    with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True, **_yt_cookies_opts()}) as ydl:
-        info = ydl.extract_info(url, download=False)
-        title = info.get('title', 'youtube_video')
-        duration = info.get('duration', 0)
-    if duration > MAX_AUDIO_DURATION_SECONDS:
-        raise ValueError(
-            f"Video is {int(duration // 60)} min long — maximum is {MAX_AUDIO_DURATION_SECONDS // 60} minutes."
-        )
-    sanitized_title = sanitize_filename(title)
-    logging.info(f"Title: {title} ({int(duration // 60)}m {int(duration % 60)}s)")
-    return sanitized_title
-
-
-def download_youtube_audio(url, output_dir):
-    audio_path = os.path.join(output_dir, "audio.wav")
-    cmd = [
-        "yt-dlp",
-        "--force-ipv4",
-        "-f", "bestaudio/bestvideo/best",
-        "-o", os.path.join(output_dir, "audio.%(ext)s"),
-        "--extract-audio",
-        "--audio-format", "wav",
-        "--postprocessor-args", "ffmpeg:-ar 16000 -ac 1",
-        "--quiet",
-        *_yt_cookies_args(),
-        url,
-    ]
-    logging.info("Downloading audio...")
-    subprocess.run(cmd, check=True)
-    return audio_path
 
 
 def extract_local_audio(video_path, output_dir):

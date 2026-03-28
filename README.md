@@ -18,15 +18,16 @@ The viewer supports:
 - Double-click to edit any note inline
 - Insert and delete rows
 - Ctrl+Z undo
-- Configurable notes per page
+- Configurable number of notes per page
 - Print-ready layout
 
 ---
 
-## Prerequisites
+## Prerequisites (running locally)
 
 - Python 3.10+
 - `ffmpeg` installed and on your PATH
+- [Deno](https://deno.com/) installed and on your PATH *(required for YouTube link support — not needed for local video/file uploads)*
 - An [AssemblyAI](https://www.assemblyai.com/) API key (free tier available)
 - A [Google Gemini](https://aistudio.google.com/) API key (free tier available)
 

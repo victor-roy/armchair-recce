@@ -1,5 +1,6 @@
 # Environment variables
 .env
+proxies.txt
 
 # Virtual Environments
 venv/
@@ -14,10 +15,6 @@ __pycache__/
 # Temporary / Output files
 temp_audio*
 outputs/
-
-# Cookie files (contain active session tokens — never commit)
-*_cookies.txt
-cookies.txt
 
 # IDEs
 .vscode/
