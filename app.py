@@ -22,7 +22,7 @@ from corecce import (
 )
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024 * 1024  # 4 GB upload limit
+app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024 * 1024  # 2 GB upload limit
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-not-for-production")
 
 INVITE_CODE = os.environ.get("INVITE_CODE")  # None = gate disabled (local dev)

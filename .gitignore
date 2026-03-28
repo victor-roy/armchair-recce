@@ -15,6 +15,10 @@ __pycache__/
 temp_audio*
 outputs/
 
+# Cookie files (contain active session tokens — never commit)
+*_cookies.txt
+cookies.txt
+
 # IDEs
 .vscode/
 .idea/

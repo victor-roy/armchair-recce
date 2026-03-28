@@ -30,6 +30,28 @@ genai_client = genai.Client()
 GEMINI_MODEL = 'gemini-2.5-flash'
 PROMPT_PATH = "pacenotes_transcription_prompt.md"
 DEFAULT_CSV_PATH = "pacenotes_shorthand.csv"
+MAX_AUDIO_DURATION_SECONDS = 30 * 60  # 30 minutes
+
+# Write YouTube cookies to a temp file once at startup if env var is set
+_COOKIES_PATH = None
+_raw_cookies = os.environ.get("YOUTUBE_COOKIES", "").strip()
+if _raw_cookies:
+    import tempfile
+    _tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
+    _tmp.write(_raw_cookies)
+    _tmp.close()
+    _COOKIES_PATH = _tmp.name
+    logging.info(f"YouTube cookies loaded from YOUTUBE_COOKIES env var → {_COOKIES_PATH}")
+
+
+def _yt_cookies_args():
+    """Returns extra yt-dlp CLI args for cookie auth, if configured."""
+    return ["--cookies", _COOKIES_PATH] if _COOKIES_PATH else []
+
+
+def _yt_cookies_opts():
+    """Returns extra yt-dlp YoutubeDL options for cookie auth, if configured."""
+    return {"cookiefile": _COOKIES_PATH} if _COOKIES_PATH else {}
 
 # JS regex special characters that need escaping
 _JS_REGEX_SPECIAL = set(r'\^$.|?*+()[]{/')
@@ -118,11 +140,16 @@ def _build_csv_highlights_js(shorthand_list):
 
 def get_youtube_title(url):
     logging.info(f"Fetching video info: {url}")
-    with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:
+    with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True, **_yt_cookies_opts()}) as ydl:
         info = ydl.extract_info(url, download=False)
         title = info.get('title', 'youtube_video')
+        duration = info.get('duration', 0)
+    if duration > MAX_AUDIO_DURATION_SECONDS:
+        raise ValueError(
+            f"Video is {int(duration // 60)} min long — maximum is {MAX_AUDIO_DURATION_SECONDS // 60} minutes."
+        )
     sanitized_title = sanitize_filename(title)
-    logging.info(f"Title: {title}")
+    logging.info(f"Title: {title} ({int(duration // 60)}m {int(duration % 60)}s)")
     return sanitized_title
 
 
@@ -137,6 +164,7 @@ def download_youtube_audio(url, output_dir):
         "--audio-format", "wav",
         "--postprocessor-args", "ffmpeg:-ar 16000 -ac 1",
         "--quiet",
+        *_yt_cookies_args(),
         url,
     ]
     logging.info("Downloading audio...")
@@ -146,6 +174,18 @@ def download_youtube_audio(url, output_dir):
 
 def extract_local_audio(video_path, output_dir):
     logging.info(f"Extracting audio from: {video_path}")
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "default=noprint_wrappers=1:nokey=1", video_path],
+        capture_output=True, text=True
+    )
+    if probe.returncode == 0 and probe.stdout.strip():
+        duration = float(probe.stdout.strip())
+        if duration > MAX_AUDIO_DURATION_SECONDS:
+            raise ValueError(
+                f"Video is {int(duration // 60)} min long — maximum is {MAX_AUDIO_DURATION_SECONDS // 60} minutes."
+            )
+        logging.info(f"Duration: {int(duration // 60)}m {int(duration % 60)}s")
     audio_path = os.path.join(output_dir, "audio.wav")
     subprocess.run([
         "ffmpeg", "-i", video_path,
