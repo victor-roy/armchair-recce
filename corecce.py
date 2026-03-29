@@ -52,29 +52,55 @@ def _shorthand_to_js_pattern(shorthand):
     return f'/{escaped}/g'
 
 
-def load_shorthand_csv(csv_path):
+def _parse_shorthand_rows(raw_rows):
     """
-    Load a shorthand CSV with columns: Note, Shorthand, Severity.
-    Returns a list of dicts with keys: note, shorthand, severity (int or None).
-    Skips blank or malformed rows.
+    Convert an iterable of dicts (with Note/Shorthand/Severity keys) into
+    the internal format. Skips blank or malformed rows.
     """
-    if not csv_path or not os.path.exists(csv_path):
-        return []
     rows = []
-    with open(csv_path, newline='', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            note = row.get('Note', '').strip()
-            shorthand = row.get('Shorthand', '').strip()
-            severity_raw = row.get('Severity', '').strip()
-            if not note or not shorthand:
-                continue
-            try:
-                severity = int(severity_raw) if severity_raw else None
-            except ValueError:
-                severity = None
-            rows.append({'note': note, 'shorthand': shorthand, 'severity': severity})
-    logging.info(f"Loaded {len(rows)} shorthand entries from {csv_path}")
+    for row in raw_rows:
+        note = str(row.get('Note') or '').strip()
+        shorthand = str(row.get('Shorthand') or '').strip()
+        severity_raw = str(row.get('Severity') or '').strip()
+        if not note or not shorthand:
+            continue
+        try:
+            severity = int(severity_raw) if severity_raw else None
+        except ValueError:
+            severity = None
+        rows.append({'note': note, 'shorthand': shorthand, 'severity': severity})
+    return rows
+
+
+def load_shorthand_csv(path):
+    """
+    Load a shorthand file (CSV, XLSX, or XLS) with columns: Note, Shorthand, Severity.
+    Reads the first sheet for Excel files. Returns a list of dicts.
+    """
+    if not path or not os.path.exists(path):
+        return []
+    ext = os.path.splitext(path)[1].lower()
+    try:
+        if ext == '.xlsx':
+            import openpyxl
+            wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+            ws = wb.active
+            headers = [str(c.value).strip() if c.value is not None else '' for c in next(ws.iter_rows(min_row=1, max_row=1))]
+            raw = [dict(zip(headers, [str(c.value).strip() if c.value is not None else '' for c in row])) for row in ws.iter_rows(min_row=2)]
+            wb.close()
+        elif ext == '.xls':
+            import xlrd
+            wb = xlrd.open_workbook(path)
+            ws = wb.sheet_by_index(0)
+            headers = [str(ws.cell_value(0, c)).strip() for c in range(ws.ncols)]
+            raw = [dict(zip(headers, [str(ws.cell_value(r, c)).strip() for c in range(ws.ncols)])) for r in range(1, ws.nrows)]
+        else:
+            with open(path, newline='', encoding='utf-8') as f:
+                raw = list(csv.DictReader(f))
+    except Exception as e:
+        raise ValueError(f"Could not read shorthand file: {e}") from e
+    rows = _parse_shorthand_rows(raw)
+    logging.info(f"Loaded {len(rows)} shorthand entries from {path}")
     return rows
 
 

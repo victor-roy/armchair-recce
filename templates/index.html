@@ -403,7 +403,7 @@
     <div id="csv-help" style="display:none;margin-bottom:0.5rem;padding:0.75rem 1rem;
          background:var(--surface);border:1px solid var(--border);border-radius:6px;
          font-size:0.78rem;line-height:1.6;color:var(--text)">
-        <strong>Format:</strong> CSV with three columns: <code>Note</code>, <code>Shorthand</code>, <code>Severity</code><br>
+        <strong>Format:</strong> CSV, XLSX, or XLS with three columns: <code>Note</code>, <code>Shorthand</code>, <code>Severity</code> (first sheet used for Excel)<br>
         <code>Note</code> — the spoken word (e.g. <em>Caution</em>)<br>
         <code>Shorthand</code> — what appears in the pace notes (e.g. <em>!</em>)<br>
         <code>Severity</code> — highlight colour:
@@ -416,8 +416,8 @@
         <a href="/download/shorthand-template.csv" style="color:var(--accent)">Download default shorthand CSV as template ↓</a>
     </div>
     <div class="file-area" id="csv-area" style="padding:0.75rem 1.5rem">
-        <input type="file" accept=".csv,text/csv" onchange="csvChosen(this)">
-        <div class="file-label" style="font-size:0.75rem">Click to browse — <span>select shorthand.csv</span></div>
+        <input type="file" accept=".csv,.xlsx,.xls,text/csv" onchange="csvChosen(this)">
+        <div class="file-label" style="font-size:0.75rem">Click to browse — <span>select shorthand.csv / .xlsx</span></div>
         <div class="file-name" id="csv-name"></div>
     </div>
 </div>

@@ -183,12 +183,17 @@ def process():
     job_id = str(uuid.uuid4())
     _set(job_id, "Starting...")
 
-    # Optional CSV upload — saved to disk so the background thread can read it
+    # Optional shorthand upload (CSV / XLSX / XLS) — saved to disk for background thread
     csv_path = None
     csv_file = request.files.get("csv")
     if csv_file and csv_file.filename:
-        csv_save_path = os.path.join(UPLOAD_DIR, f"{job_id}_shorthand.csv")
-        csv_file.save(csv_save_path)
+        data = csv_file.read()
+        if len(data) > 1 * 1024 * 1024:
+            return jsonify({"error": "Shorthand file must be under 1 MB"}), 400
+        ext = os.path.splitext(csv_file.filename)[1].lower() or '.csv'
+        csv_save_path = os.path.join(UPLOAD_DIR, f"{job_id}_shorthand{ext}")
+        with open(csv_save_path, 'wb') as fh:
+            fh.write(data)
         csv_path = csv_save_path
 
     if mode == "youtube":
