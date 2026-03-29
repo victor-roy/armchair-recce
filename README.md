@@ -27,7 +27,6 @@ The viewer supports:
 
 - Python 3.10+
 - `ffmpeg` installed and on your PATH
-- [Deno](https://deno.com/) installed and on your PATH *(required for YouTube link support — not needed for local video/file uploads)*
 - An [AssemblyAI](https://www.assemblyai.com/) API key (free tier available)
 - A [Google Gemini](https://aistudio.google.com/) API key (free tier available)
 
