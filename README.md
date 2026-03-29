@@ -6,7 +6,7 @@ CoRecce takes a YouTube link or local video file, transcribes the audio, and use
 
 ---
 
-## What it does
+## How it works
 
 1. **Downloads or ingests** audio from a YouTube link or local video file
 2. **Transcribes** the audio using AssemblyAI; the LLM filters out driver reactions and non-pacenote content
@@ -36,8 +36,8 @@ The viewer supports:
 ## Setup
 
 ```bash
-git clone https://github.com/yourname/corecce.git
-cd corecce
+git clone https://github.com/victor-roy/armchair-recce.git
+cd armchair-recce
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -232,9 +232,27 @@ For hosted deployments (e.g. Railway), set environment variables in the platform
 
 ## Contributing
 
-Pull requests are welcome. If you're a co-driver and want to improve the shorthand prompt for your region's conventions, start with `pacenotes_transcription_prompt.md` — that's where all the LLM instructions live.
+Pull requests are welcome.
 
-If you find a video that produces bad results, opening an issue with the transcription excerpt (not the full video) helps a lot.
+### Local setup for contributors
+
+Install pre-commit and register the hooks:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+Hooks run automatically on every `git commit`. Please also run them before pushing:
+
+```bash
+pre-commit run --all-files
+```
+
+### Where to start
+
+- **Shorthand prompt** — if you want to improve transcription quality or adapt shorthand for your region's conventions, start with `pacenotes_transcription_prompt.md`.
+- **Bug reports** — if a video produces bad results, open an issue with the relevant excerpt from `transcription.txt` (not the full video URL).
 
 ---
 

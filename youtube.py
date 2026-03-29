@@ -7,6 +7,7 @@ from yt_dlp.utils import sanitize_filename
 
 MAX_AUDIO_DURATION_SECONDS = 30 * 60  # 30 minutes
 
+
 def _parse_proxy(line):
     """Accept either socks5://user:pass@host:port or host:port:user:pass (Webshare format)."""
     line = line.strip()
@@ -23,13 +24,16 @@ def _parse_proxy(line):
 
 # Load residential proxy list from env var (newline-separated, either format)
 _PROXY_LIST = [
-    p for p in (_parse_proxy(l) for l in os.environ.get("YTDLP_PROXIES", "").splitlines())
+    p
+    for p in (
+        _parse_proxy(raw) for raw in os.environ.get("YTDLP_PROXIES", "").splitlines()
+    )
     if p
 ]
 if _PROXY_LIST:
     logging.info(f"Loaded {len(_PROXY_LIST)} proxies from YTDLP_PROXIES")
 
-_BOT_SIGNALS = ("sign in", "bot", "confirm")
+_BOT_SIGNALS = ("sign in", "bot", "confirm", "getpot")
 
 
 def get_youtube_title(url, max_duration=MAX_AUDIO_DURATION_SECONDS):
@@ -37,20 +41,23 @@ def get_youtube_title(url, max_duration=MAX_AUDIO_DURATION_SECONDS):
     proxies = _PROXY_LIST or [None]
     last_exc = None
     for proxy in proxies:
-        opts = {'quiet': True, 'no_warnings': True}
+        opts = {"quiet": True, "no_warnings": True}
         if proxy:
-            opts['proxy'] = proxy
+            opts["proxy"] = proxy
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=False)
-                title = info.get('title', 'youtube_video')
-                duration = info.get('duration', 0)
+                title = info.get("title", "youtube_video")
+                duration = info.get("duration", 0)
             if duration > max_duration:
+                max_min = max_duration // 60
                 raise ValueError(
-                    f"Video is {int(duration // 60)} min long — maximum is {max_duration // 60} minutes."
+                    f"Video is {int(duration // 60)} min long — maximum is {max_min} minutes."
                 )
             sanitized = sanitize_filename(title)
-            logging.info(f"Title: {title} ({int(duration // 60)}m {int(duration % 60)}s)")
+            logging.info(
+                f"Title: {title} ({int(duration // 60)}m {int(duration % 60)}s)"
+            )
             return sanitized
         except ValueError:
             raise
@@ -71,11 +78,15 @@ def download_youtube_audio(url, output_dir):
         cmd = [
             "yt-dlp",
             "--force-ipv4",
-            "-f", "bestaudio/best",
-            "-o", os.path.join(output_dir, "audio.%(ext)s"),
+            "-f",
+            "bestaudio/best",
+            "-o",
+            os.path.join(output_dir, "audio.%(ext)s"),
             "--extract-audio",
-            "--audio-format", "wav",
-            "--postprocessor-args", "ffmpeg:-ar 16000 -ac 1",
+            "--audio-format",
+            "wav",
+            "--postprocessor-args",
+            "ffmpeg:-ar 16000 -ac 1",
             "--quiet",
             *(["--proxy", proxy] if proxy else []),
             url,
@@ -87,7 +98,9 @@ def download_youtube_audio(url, output_dir):
         except subprocess.CalledProcessError as e:
             err = (e.stderr or "").lower()
             if any(w in err for w in _BOT_SIGNALS):
-                logging.warning(f"Proxy {proxy} bot-detected on download, trying next...")
+                logging.warning(
+                    f"Proxy {proxy} bot-detected on download, trying next..."
+                )
                 last_exc = e
                 continue
             raise
