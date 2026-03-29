@@ -5,11 +5,14 @@ import re
 import subprocess
 import argparse
 
+
+class QuotaError(RuntimeError):
+    """Raised when an external API quota or rate limit is exceeded."""
+
 import assemblyai as aai
-import yt_dlp
-from yt_dlp.utils import sanitize_filename
 from google import genai
 from dotenv import load_dotenv
+from youtube import get_youtube_title, download_youtube_audio
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -26,6 +29,7 @@ genai_client = genai.Client()
 GEMINI_MODEL = 'gemini-2.5-flash'
 PROMPT_PATH = "pacenotes_transcription_prompt.md"
 DEFAULT_CSV_PATH = "pacenotes_shorthand.csv"
+MAX_AUDIO_DURATION_SECONDS = 30 * 60  # 30 minutes
 
 # JS regex special characters that need escaping
 _JS_REGEX_SPECIAL = set(r'\^$.|?*+()[]{/')
@@ -48,29 +52,55 @@ def _shorthand_to_js_pattern(shorthand):
     return f'/{escaped}/g'
 
 
-def load_shorthand_csv(csv_path):
+def _parse_shorthand_rows(raw_rows):
     """
-    Load a shorthand CSV with columns: Note, Shorthand, Severity.
-    Returns a list of dicts with keys: note, shorthand, severity (int or None).
-    Skips blank or malformed rows.
+    Convert an iterable of dicts (with Note/Shorthand/Severity keys) into
+    the internal format. Skips blank or malformed rows.
     """
-    if not csv_path or not os.path.exists(csv_path):
-        return []
     rows = []
-    with open(csv_path, newline='', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            note = row.get('Note', '').strip()
-            shorthand = row.get('Shorthand', '').strip()
-            severity_raw = row.get('Severity', '').strip()
-            if not note or not shorthand:
-                continue
-            try:
-                severity = int(severity_raw) if severity_raw else None
-            except ValueError:
-                severity = None
-            rows.append({'note': note, 'shorthand': shorthand, 'severity': severity})
-    logging.info(f"Loaded {len(rows)} shorthand entries from {csv_path}")
+    for row in raw_rows:
+        note = str(row.get('Note') or '').strip()
+        shorthand = str(row.get('Shorthand') or '').strip()
+        severity_raw = str(row.get('Severity') or '').strip()
+        if not note or not shorthand:
+            continue
+        try:
+            severity = int(severity_raw) if severity_raw else None
+        except ValueError:
+            severity = None
+        rows.append({'note': note, 'shorthand': shorthand, 'severity': severity})
+    return rows
+
+
+def load_shorthand_csv(path):
+    """
+    Load a shorthand file (CSV, XLSX, or XLS) with columns: Note, Shorthand, Severity.
+    Reads the first sheet for Excel files. Returns a list of dicts.
+    """
+    if not path or not os.path.exists(path):
+        return []
+    ext = os.path.splitext(path)[1].lower()
+    try:
+        if ext == '.xlsx':
+            import openpyxl
+            wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+            ws = wb.active
+            headers = [str(c.value).strip() if c.value is not None else '' for c in next(ws.iter_rows(min_row=1, max_row=1))]
+            raw = [dict(zip(headers, [str(c.value).strip() if c.value is not None else '' for c in row])) for row in ws.iter_rows(min_row=2)]
+            wb.close()
+        elif ext == '.xls':
+            import xlrd
+            wb = xlrd.open_workbook(path)
+            ws = wb.sheet_by_index(0)
+            headers = [str(ws.cell_value(0, c)).strip() for c in range(ws.ncols)]
+            raw = [dict(zip(headers, [str(ws.cell_value(r, c)).strip() for c in range(ws.ncols)])) for r in range(1, ws.nrows)]
+        else:
+            with open(path, newline='', encoding='utf-8') as f:
+                raw = list(csv.DictReader(f))
+    except Exception as e:
+        raise ValueError(f"Could not read shorthand file: {e}") from e
+    rows = _parse_shorthand_rows(raw)
+    logging.info(f"Loaded {len(rows)} shorthand entries from {path}")
     return rows
 
 
@@ -112,36 +142,20 @@ def _build_csv_highlights_js(shorthand_list):
     return "\n".join(lines)
 
 
-def get_youtube_title(url):
-    logging.info(f"Fetching video info: {url}")
-    with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:
-        info = ydl.extract_info(url, download=False)
-        title = info.get('title', 'youtube_video')
-    sanitized_title = sanitize_filename(title)
-    logging.info(f"Title: {title}")
-    return sanitized_title
-
-
-def download_youtube_audio(url, output_dir):
-    audio_path = os.path.join(output_dir, "audio.wav")
-    cmd = [
-        "yt-dlp",
-        "--force-ipv4",
-        "-f", "bestaudio/best",
-        "-o", os.path.join(output_dir, "audio.%(ext)s"),
-        "--extract-audio",
-        "--audio-format", "wav",
-        "--postprocessor-args", "ffmpeg:-ar 16000 -ac 1",
-        "--quiet",
-        url,
-    ]
-    logging.info("Downloading audio...")
-    subprocess.run(cmd, check=True)
-    return audio_path
-
-
 def extract_local_audio(video_path, output_dir):
     logging.info(f"Extracting audio from: {video_path}")
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "default=noprint_wrappers=1:nokey=1", video_path],
+        capture_output=True, text=True
+    )
+    if probe.returncode == 0 and probe.stdout.strip():
+        duration = float(probe.stdout.strip())
+        if duration > MAX_AUDIO_DURATION_SECONDS:
+            raise ValueError(
+                f"Video is {int(duration // 60)} min long — maximum is {MAX_AUDIO_DURATION_SECONDS // 60} minutes."
+            )
+        logging.info(f"Duration: {int(duration // 60)}m {int(duration % 60)}s")
     audio_path = os.path.join(output_dir, "audio.wav")
     subprocess.run([
         "ffmpeg", "-i", video_path,
@@ -168,7 +182,10 @@ def transcribe_and_diarize(audio_path):
     transcript = transcriber.transcribe(audio_path, config=config)
 
     if transcript.status == aai.TranscriptStatus.error:
-        raise RuntimeError(f"AssemblyAI transcription failed: {transcript.error}")
+        msg = transcript.error or ""
+        if "rate limit" in msg.lower() or "quota" in msg.lower() or "limit exceeded" in msg.lower():
+            raise QuotaError("AssemblyAI transcription limit reached — please try again later.")
+        raise RuntimeError(f"AssemblyAI transcription failed: {msg}")
 
     # Group all words into segments by pause threshold
     PAUSE_THRESHOLD_MS = 400  # new segment when gap between words exceeds this
@@ -209,7 +226,14 @@ def translate_to_pacenotes(codriver_transcription, shorthand_list=None):
     prompt = prompt.replace("{{TRANSCRIPTION}}", codriver_transcription)
 
     logging.info("Sending to Gemini for pace note conversion...")
-    response = genai_client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+    try:
+        response = genai_client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+    except Exception as e:
+        name = type(e).__name__
+        msg = str(e).lower()
+        if "resourceexhausted" in name or "429" in msg or "quota" in msg or "rate limit" in msg:
+            raise QuotaError("Gemini API limit reached — please try again later.") from e
+        raise
     return response.text.strip()
 
 

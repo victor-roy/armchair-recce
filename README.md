@@ -2,14 +2,14 @@
 
 Turn rally onboard videos into printable, interactive pace notes — in minutes.
 
-CoRecce takes a YouTube link or local video file, isolates the co-driver's calls using speaker diarization, and uses an LLM to convert them into clean rally shorthand. The result is an interactive HTML pace note viewer you can use on a tablet in the car, or print and cut for a real stage.
+CoRecce takes a YouTube link or local video file, transcribes the audio, and uses an LLM to extract and convert co-driver calls into clean rally shorthand. The result is an interactive HTML pace note viewer you can use on a tablet in the car, or print and cut for a real stage.
 
 ---
 
 ## What it does
 
 1. **Downloads or ingests** audio from a YouTube link or local video file
-2. **Transcribes** the co-driver's voice using AssemblyAI (speaker diarization separates co-driver from driver)
+2. **Transcribes** the audio using AssemblyAI; the LLM filters out driver reactions and non-pacenote content
 3. **Converts** the transcription into rally shorthand using Gemini 2.5 Flash
 4. **Outputs** an interactive HTML pace note viewer — paginated, editable, printable
 
@@ -18,15 +18,16 @@ The viewer supports:
 - Double-click to edit any note inline
 - Insert and delete rows
 - Ctrl+Z undo
-- Configurable notes per page
+- Configurable number of notes per page
 - Print-ready layout
 
 ---
 
-## Prerequisites
+## Prerequisites (running locally)
 
 - Python 3.10+
 - `ffmpeg` installed and on your PATH
+- [Deno](https://deno.com/) installed and on your PATH *(required for YouTube link support — not needed for local video/file uploads)*
 - An [AssemblyAI](https://www.assemblyai.com/) API key (free tier available)
 - A [Google Gemini](https://aistudio.google.com/) API key (free tier available)
 
@@ -61,12 +62,12 @@ python app.py
 
 Open `http://localhost:5000` in your browser. Four modes are available:
 
-| Tab | Input | Output |
-|-----|-------|--------|
-| YouTube Link | Public YouTube URL | Pace notes HTML |
-| Local Video | Any video file (MP4, MKV, etc.) | Pace notes HTML |
-| Transcription File | Existing `transcription.txt` | Pace notes HTML |
-| Re-render | Existing `pacenotes.txt` | Re-rendered HTML |
+| Tab | Input |
+|-----|-------|
+| YouTube Link | Public YouTube URL |
+| Local Video | Any video file (MP4, MKV, etc.) |
+| Transcription File | Existing `transcription.txt` |
+| Re-render | Existing `pacenotes.txt` |
 
 All processing tabs include an optional **Shorthand CSV** file picker (see below). The transcription + LLM step typically takes **2–5 minutes** depending on video length. Progress is shown in real time.
 
@@ -117,6 +118,13 @@ Jump,Jmp,3
 Slippy,$,2
 ```
 
+### Using a custom CSV
+
+- **Web app:** use the "Shorthand CSV (optional)" file picker on any processing tab to upload a CSV that overrides the default for that run.
+- **CLI:** pass `--shorthand-csv /path/to/my.csv`
+
+The list is **definitive**: every term found in the `Note` column is translated to its `Shorthand`. Terms not in the list are kept as transcribed, unless they match a known homophone or transcription error.
+
 ### Severity colours
 
 | Severity | Colour | Use for |
@@ -125,20 +133,6 @@ Slippy,$,2
 | 2 | Orange | Moderate warnings (care, slippy, narrow) |
 | 3 | Peach | Attention notes (tightens, brake, jump) |
 | *(blank)* | No highlight | Neutral shorthand (kinks, crest, etc.) |
-
-### Casing convention (small-caps rendering)
-
-The viewer renders all note text in **small-caps**, so letter case in your shorthand values controls visual size:
-
-- **First letter uppercase, rest lowercase** → first letter is a large cap, rest are small caps (e.g. `Care`, `Dont`, `Decept`)
-- **All uppercase** → all letters appear as full large caps (e.g. `HP`, `IN`)
-
-### Using a custom CSV
-
-- **Web app:** use the "Shorthand CSV (optional)" file picker on any processing tab to upload a CSV that overrides the default for that run.
-- **CLI:** pass `--shorthand-csv /path/to/my.csv`
-
-The list is **definitive**: every term found in the `Note` column is translated to its `Shorthand`. Terms not in the list are kept as transcribed, unless they match a known homophone or transcription error.
 
 ---
 
@@ -160,7 +154,7 @@ outputs/
 
 ## Pace note shorthand
 
-CoRecce uses standard international rally shorthand conventions:
+CoRecce uses a standard set of rally codriving shorthand, which can be modified to the user's preferences:
 
 | Symbol | Meaning |
 |--------|---------|
@@ -196,10 +190,10 @@ L5 R6 L6
 
 ---
 
-## Tips for best results
+## Troubleshooting Transcription Quality
 
 - **Video quality matters.** Onboards with a clear co-driver microphone (not just cabin audio) produce significantly better transcriptions.
-- **Review the transcription first.** Open `transcription.txt` after the transcription step — if the co-driver wasn't correctly isolated, you can manually clean it and use the *Transcription File* tab to regenerate pace notes without re-transcribing.
+- **Review the transcription first.** Open `transcription.txt` after the transcription step — if there are obvious errors or noise segments, you can manually clean it and use the *Transcription File* tab to regenerate pace notes without re-transcribing.
 - **Use Re-render freely.** If you tweak `pacenotes.txt` by hand, use Re-render to regenerate the HTML without any API calls. Your shorthand CSV will be re-applied.
 - **Edit in the viewer.** The HTML viewer is fully editable — double-click any note to fix it on the fly, then hit Save to download the updated file.
 - **Tune your CSV.** Edit `pacenotes_shorthand.csv` to match your co-driver's vocabulary. The CSV is the single source of truth for what gets translated and how it's highlighted.
@@ -214,6 +208,25 @@ Both APIs have generous free tiers:
 - **Google Gemini** — free tier via Google AI Studio; enable billing for higher limits
 
 A typical 20-minute stage costs roughly $0.02–0.05 in API calls on paid tiers.
+
+---
+
+## Self-hosting with Docker
+
+A `Dockerfile` is included for running CoRecce on your own machine or server without installing Python or ffmpeg manually.
+
+```bash
+docker build -t corecce .
+docker run -p 5000:5000 \
+  -e GEMINI_API_KEY=your_key \
+  -e ASSEMBLY_AI_API_KEY=your_key \
+  -v $(pwd)/outputs:/app/outputs \
+  corecce
+```
+
+Open `http://localhost:5000`. The `outputs` volume mount persists generated files between runs.
+
+For hosted deployments (e.g. Railway), set environment variables in the platform dashboard rather than passing them via `-e`. Copy `.env.example` to `.env` as a starting point for local dev.
 
 ---
 
