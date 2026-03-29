@@ -152,6 +152,9 @@
         /* ── Uncertain terms ─────────────────────────────────── */
         .uncertain { background: rgba(255, 210, 0, 0.25); color: #ffd700; font-style: italic; }
 
+        /* ── Modifier superscript (+/-) ──────────────────────── */
+        .modifier-sup { vertical-align: super; font-size: 0.65em; line-height: 0; }
+
         /* ── Hint bar ────────────────────────────────────────── */
         #hint {
             height: 28px;
@@ -221,6 +224,7 @@
             .sev-2 { color: #cc5500; font-weight: bold; }
             .sev-3 { color: #cc8855; font-weight: bold; }
             .uncertain { background: #fffacc; color: #887700; font-style: italic; }
+            .modifier-sup { vertical-align: super; font-size: 0.65em; line-height: 0; }
         }
     </style>
 </head>
@@ -258,6 +262,7 @@
     // Severity highlight patterns — injected by Python from the shorthand CSV
     const HIGHLIGHTS = [
         { pattern: /\[\?[^\]]*\]/g, cls: 'uncertain' },
+        { pattern: /(?<=\d)[+\-]/g, cls: 'modifier-sup' },
         // {{CSV_HIGHLIGHTS}}
     ];
 
