@@ -236,24 +236,18 @@ Pull requests are welcome.
 
 ### Local setup for contributors
 
-Install development dependencies and set up pre-commit hooks:
+Install pre-commit and register the hooks:
 
 ```bash
 pip install pre-commit
 pre-commit install
 ```
 
-Hooks will now run automatically on every `git commit`. To run them manually against all files:
+Hooks run automatically on every `git commit`. Please also run them before pushing:
 
 ```bash
 pre-commit run --all-files
 ```
-
-### CI enforcement
-
-A GitHub Actions workflow runs the same pre-commit checks on every push and pull request. PRs must pass this check before merging — see `.github/workflows/pre-commit.yml`.
-
-To enable branch protection locally after forking, go to **Settings → Branches → Add rule** for `main`, enable *Require status checks to pass*, and add `pre-commit` as a required check.
 
 ### Where to start
 
