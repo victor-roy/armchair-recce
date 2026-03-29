@@ -307,8 +307,10 @@
 <div class="tabs" id="tabs">
     <button class="tab-btn active" data-tab="youtube">YouTube Link</button>
     <button class="tab-btn" data-tab="local">Local Video</button>
+    {% if not gate_enabled %}
     <button class="tab-btn" data-tab="transcription">Transcription File</button>
     <button class="tab-btn" data-tab="rerender">Re-render</button>
+    {% endif %}
     <button class="tab-btn" data-tab="view">View Pace Notes</button>
 </div>
 
@@ -332,6 +334,7 @@
         <button class="submit-btn" onclick="submit('local')">Extract &amp; Generate</button>
     </div>
 
+    {% if not gate_enabled %}
     <!-- ── Transcription File ──────────────────────── -->
     <div class="tab-panel" id="tab-transcription">
         <label>Transcription File (.txt)</label>
@@ -361,6 +364,7 @@
         </div>
         <button class="submit-btn" onclick="submit('rerender')">Re-render HTML</button>
     </div>
+    {% endif %}
 
     <!-- ── View Pace Notes ─────────────────────────── -->
     <div class="tab-panel" id="tab-view">
@@ -389,7 +393,28 @@
 
 <!-- ── Shorthand CSV (shared, outside card) ───────────── -->
 <div id="csv-section" style="width:100%;max-width:580px;margin-top:1rem">
-    <label style="margin-top:0">Shorthand CSV <span style="color:var(--muted);text-transform:none">(optional — overrides default)</span></label>
+    <label style="margin-top:0;display:flex;align-items:center;gap:0.5rem">
+        Shorthand CSV
+        <span style="color:var(--muted);text-transform:none;font-weight:normal">(optional — overrides default)</span>
+        <button type="button" onclick="toggleCsvHelp()"
+            style="background:none;border:1px solid var(--muted);border-radius:50%;width:1.1rem;height:1.1rem;
+                   font-size:0.65rem;cursor:pointer;color:var(--muted);padding:0;line-height:1;flex-shrink:0">?</button>
+    </label>
+    <div id="csv-help" style="display:none;margin-bottom:0.5rem;padding:0.75rem 1rem;
+         background:var(--surface);border:1px solid var(--border);border-radius:6px;
+         font-size:0.78rem;line-height:1.6;color:var(--text)">
+        <strong>Format:</strong> CSV with three columns: <code>Note</code>, <code>Shorthand</code>, <code>Severity</code><br>
+        <code>Note</code> — the spoken word (e.g. <em>Caution</em>)<br>
+        <code>Shorthand</code> — what appears in the pace notes (e.g. <em>!</em>)<br>
+        <code>Severity</code> — highlight colour:
+            <span style="color:#ff1a1a;font-weight:bold">1 = red</span>,
+            <span style="color:#ff8c00;font-weight:bold">2 = orange</span>,
+            <span style="color:#ffc19a;font-weight:bold">3 = peach</span>,
+            blank = no highlight<br><br>
+        <strong>Example:</strong><br>
+        <code>Note,Shorthand,Severity<br>Caution,!,1<br>Tightens,&gt;,3<br>Kink,K,</code><br><br>
+        <a href="/download/shorthand-template.csv" style="color:var(--accent)">Download default shorthand CSV as template ↓</a>
+    </div>
     <div class="file-area" id="csv-area" style="padding:0.75rem 1.5rem">
         <input type="file" accept=".csv,text/csv" onchange="csvChosen(this)">
         <div class="file-label" style="font-size:0.75rem">Click to browse — <span>select shorthand.csv</span></div>
@@ -417,6 +442,12 @@
         fileInputs[areaId] = file;
         document.getElementById(areaId).classList.add('has-file');
         document.getElementById(nameId).textContent = file.name;
+    }
+
+    // ── CSV help tooltip ─────────────────────────────
+    function toggleCsvHelp() {
+        const el = document.getElementById('csv-help');
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
     }
 
     // ── CSV chooser ──────────────────────────────────

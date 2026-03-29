@@ -244,5 +244,12 @@ def serve_output(filepath):
     return send_from_directory("outputs", filepath)
 
 
+@app.route("/download/shorthand-template.csv")
+def download_shorthand_template():
+    return send_from_directory(".", "pacenotes_shorthand.csv",
+                               as_attachment=True,
+                               download_name="shorthand-template.csv")
+
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
