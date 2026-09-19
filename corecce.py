@@ -228,7 +228,9 @@ def transcribe_and_diarize(audio_path, *, api_key=None):
         format_text=True,
     )
 
-    transcriber = aai.Transcriber(api_key=aai_key)
+    # Per-request client so concurrent BYOK users never share a global key
+    client = aai.Client(settings=aai.Settings(api_key=aai_key))
+    transcriber = aai.Transcriber(client=client)
     logging.info("Transcribing (this runs in the cloud)...")
     transcript = transcriber.transcribe(audio_path, config=config)
 
