@@ -20,7 +20,10 @@
             background: var(--bg);
             color: var(--text);
             height: 100vh;
+            height: 100dvh;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
         /* ── Header ─────────────────────────────────────────── */
@@ -39,14 +42,19 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            max-width: 65%;
+            flex: 1;
+            min-width: 0;
+            margin-right: 1rem;
         }
 
         #nav {
             display: flex;
             align-items: center;
             gap: 0.75rem;
+            flex-shrink: 0;
         }
+
+        #nav button, #nav label { white-space: nowrap; }
 
         #page-counter {
             font-size: 0.8rem;
@@ -70,7 +78,8 @@
         /* ── Page stage ─────────────────────────────────────── */
         #stage {
             position: relative;
-            height: calc(100vh - 48px - 28px);
+            flex: 1;
+            min-height: 0;
         }
 
         .page {
@@ -167,8 +176,15 @@
 
         /* ── Mobile ─────────────────────────────────────────── */
         @media (max-width: 640px) {
-            .page { padding-left: 1rem; }
-            .pacenote { width: calc(100vw - 2rem); }
+            #header { flex-wrap: wrap; gap: 0.5rem; padding: 0.5rem 1rem; }
+            #title { flex-basis: 100%; margin-right: 0; }
+            #nav { width: 100%; flex-shrink: 1; justify-content: space-between; gap: 0.4rem; }
+            #nav button { padding: 0.3rem 0.55rem; }
+            #nav label { display: none; }
+            #page-counter { min-width: 0; }
+            #hint { display: none; }
+            .page { padding: 1rem 1rem 1rem 0.5rem; }
+            .pacenote { width: calc(100vw - 1.5rem); font-size: 1.4rem; }
         }
 
         /* ── Print ──────────────────────────────────────────── */
