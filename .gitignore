@@ -19,3 +19,6 @@ outputs/
 # IDEs
 .vscode/
 .idea/
+# Local planning docs and session notes (may contain conversation history)
+plans/
+.claude/sessions/

@@ -6,6 +6,17 @@ CoRecce takes a YouTube link or local video file, transcribes the audio, and use
 
 ---
 
+## Try it online
+
+**[armchair-recce.up.railway.app](https://armchair-recce.up.railway.app)** — no install needed. Two ways in:
+
+- **Bring your own keys** — paste a free [AssemblyAI](https://www.assemblyai.com/dashboard/signup) key and a free [Gemini](https://aistudio.google.com/app/apikey) key. They're kept only in your browser session and cleared when you sign out.
+- **Access code** — if I've given you one, it runs on my keys.
+
+Outputs on the hosted app are shared between users, so don't upload anything private. For that, run it locally (below).
+
+---
+
 ## How it works
 
 1. **Downloads or ingests** audio from a YouTube link or local video file
@@ -225,7 +236,7 @@ docker run -p 5000:5000 \
 
 Open `http://localhost:5000`. The `outputs` volume mount persists generated files between runs.
 
-For hosted deployments (e.g. Railway), set environment variables in the platform dashboard rather than passing them via `-e`. Copy `.env.example` to `.env` as a starting point for local dev.
+For hosted deployments (e.g. Railway), set environment variables in the platform dashboard rather than passing them via `-e`. Setting `INVITE_CODE` and `SECRET_KEY` turns on the access gate (access code or bring-your-own-keys); leave them unset locally and the gate stays off. Copy `.env.example` to `.env` as a starting point for local dev.
 
 ---
 

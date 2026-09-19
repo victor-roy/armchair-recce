@@ -1,4 +1,6 @@
+import hmac
 import os
+import re
 import uuid
 import threading
 import logging
@@ -40,7 +42,13 @@ app.config["SESSION_COOKIE_SECURE"] = not app.debug
 INVITE_CODE = os.environ.get("INVITE_CODE")  # None = gate disabled (local dev)
 RATE_LIMIT = os.environ.get("RATE_LIMIT", "10 per hour")
 
-limiter = Limiter(get_remote_address, app=app, default_limits=[])
+
+def _client_ip():
+    """Visitor IP: Railway's edge sets X-Real-IP; otherwise all users share the proxy IP."""
+    return request.headers.get("X-Real-IP") or get_remote_address()
+
+
+limiter = Limiter(_client_ip, app=app, default_limits=[])
 
 
 def _is_authed():
@@ -88,6 +96,21 @@ def login_required(f):
     return decorated
 
 
+def _safe_name(name, fallback):
+    """Strip path separators and leading dots so user/YouTube input can't escape outputs/."""
+    cleaned = re.sub(r"[^\w\- .()]", "_", name or "").strip(" .")
+    return cleaned[:120] or fallback
+
+
+def _save_upload(f, job_id):
+    """Save an uploaded file under a server-chosen name; returns (path, safe title)."""
+    stem, ext = os.path.splitext(f.filename or "")
+    safe_ext = re.sub(r"[^\w.]", "", ext)[:10]
+    path = os.path.join(UPLOAD_DIR, f"{job_id}{safe_ext}")
+    f.save(path)
+    return path, _safe_name(stem, job_id)
+
+
 UPLOAD_DIR = os.path.join("outputs", "temp", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -104,7 +127,7 @@ def run_youtube(job_id, url, csv_path=None, assemblyai_key=None, gemini_key=None
         shorthand_list = _get_shorthand_list(csv_path)
 
         _set(job_id, "Fetching video info...")
-        title = get_youtube_title(url)
+        title = _safe_name(get_youtube_title(url), job_id)
         output_dir = os.path.join("outputs", title)
         os.makedirs(output_dir, exist_ok=True)
         save_info(output_dir, title, source=url)
@@ -254,9 +277,10 @@ def index():
 
 
 @app.route("/auth", methods=["POST"])
+@limiter.limit("10 per minute")
 def auth():
     code = request.form.get("invite_code", "").strip()
-    if INVITE_CODE and code == INVITE_CODE:
+    if INVITE_CODE and hmac.compare_digest(code.encode(), INVITE_CODE.encode()):
         session["authenticated"] = True
         return redirect(url_for("index"))
     return render_template("index.html", **_gate_ctx(), auth_error=True)
@@ -315,9 +339,7 @@ def process():
         f = request.files.get("file")
         if not f:
             return jsonify({"error": "No file provided"}), 400
-        title = os.path.splitext(f.filename)[0]
-        save_path = os.path.join(UPLOAD_DIR, f.filename)
-        f.save(save_path)
+        save_path, title = _save_upload(f, job_id)
         threading.Thread(
             target=run_local_video,
             args=(job_id, save_path, title, csv_path, assemblyai_key, gemini_key),
@@ -328,9 +350,8 @@ def process():
         f = request.files.get("file")
         if not f:
             return jsonify({"error": "No file provided"}), 400
-        title = request.form.get("title", "").strip() or os.path.splitext(f.filename)[0]
-        save_path = os.path.join(UPLOAD_DIR, f.filename)
-        f.save(save_path)
+        save_path, file_title = _save_upload(f, job_id)
+        title = _safe_name(request.form.get("title", "").strip(), file_title)
         threading.Thread(
             target=run_transcription_file,
             args=(job_id, save_path, title, csv_path, gemini_key),
@@ -341,11 +362,11 @@ def process():
         f = request.files.get("file")
         if not f:
             return jsonify({"error": "No file provided"}), 400
-        title = request.form.get("title", "").strip() or os.path.splitext(f.filename)[
-            0
-        ].replace("_pacenotes", "")
-        save_path = os.path.join(UPLOAD_DIR, f.filename)
-        f.save(save_path)
+        save_path, file_title = _save_upload(f, job_id)
+        title = _safe_name(
+            request.form.get("title", "").strip(),
+            file_title.replace("_pacenotes", ""),
+        )
         threading.Thread(
             target=run_rerender, args=(job_id, save_path, title, csv_path), daemon=True
         ).start()
