@@ -4,6 +4,8 @@ Turn rally onboard videos into printable, interactive pace notes — in minutes.
 
 CoRecce takes a YouTube link or local video file, transcribes the audio, and uses an LLM to extract and convert co-driver calls into clean rally shorthand. The result is an interactive HTML pace note viewer you can use on a tablet in the car, or print and cut for a real stage.
 
+![Pace note viewer: Lia Block, Oregon Trail Rally 2023 SS16, with Care and Dont highlighted by severity](images/pacenote-viewer.png)
+
 ---
 
 ## Try it online
@@ -13,7 +15,7 @@ CoRecce takes a YouTube link or local video file, transcribes the audio, and use
 - **Bring your own keys** — paste a free [AssemblyAI](https://www.assemblyai.com/dashboard/signup) key and a free [Gemini](https://aistudio.google.com/app/apikey) key. They're kept only in your browser session and cleared when you sign out.
 - **Access code** — if I've given you one, it runs on my keys.
 
-Outputs on the hosted app are shared between users, so don't upload anything private. For that, run it locally (below).
+Your outputs are private to your browser session. Signing out ends that session, so save or print your pace notes first.
 
 ---
 
@@ -261,6 +263,7 @@ pre-commit run --all-files
 
 ### Where to start
 
+- **Good first issues** — [#8](https://github.com/victor-roy/armchair-recce/issues/8) (prompt: accent homophones, no code) and [#4](https://github.com/victor-roy/armchair-recce/issues/4) (first unit tests). See the [`good first issue`](https://github.com/victor-roy/armchair-recce/labels/good%20first%20issue) label.
 - **Shorthand prompt** — if you want to improve transcription quality or adapt shorthand for your region's conventions, start with `pacenotes_transcription_prompt.md`.
 - **Bug reports** — if a video produces bad results, open an issue with the relevant excerpt from `transcription.txt` (not the full video URL).
 

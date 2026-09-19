@@ -111,6 +111,19 @@ def _save_upload(f, job_id):
     return path, _safe_name(stem, job_id)
 
 
+def _owner():
+    """Per-session output folder name; "" when the gate is off (local dev keeps outputs/<title>)."""
+    if not INVITE_CODE:
+        return ""
+    return session.setdefault("owner", uuid.uuid4().hex)
+
+
+def _output_paths(owner, title):
+    """Return (output_dir, result_url) for a job, scoped to the session's folder."""
+    rel = os.path.join(owner, title) if owner else title
+    return os.path.join("outputs", rel), f"/outputs/{rel}/pacenotes.html"
+
+
 UPLOAD_DIR = os.path.join("outputs", "temp", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -122,13 +135,15 @@ def _set(job_id, message, status="running", result_url=None):
     jobs[job_id] = {"status": status, "message": message, "result_url": result_url}
 
 
-def run_youtube(job_id, url, csv_path=None, assemblyai_key=None, gemini_key=None):
+def run_youtube(
+    job_id, url, csv_path=None, assemblyai_key=None, gemini_key=None, owner=""
+):
     try:
         shorthand_list = _get_shorthand_list(csv_path)
 
         _set(job_id, "Fetching video info...")
         title = _safe_name(get_youtube_title(url), job_id)
-        output_dir = os.path.join("outputs", title)
+        output_dir, result_url = _output_paths(owner, title)
         os.makedirs(output_dir, exist_ok=True)
         save_info(output_dir, title, source=url)
 
@@ -152,7 +167,7 @@ def run_youtube(job_id, url, csv_path=None, assemblyai_key=None, gemini_key=None
             job_id,
             "Done!",
             status="done",
-            result_url=f"/outputs/{title}/pacenotes.html",
+            result_url=result_url,
         )
     except QuotaError as e:
         _set(job_id, str(e), status="error")
@@ -162,12 +177,18 @@ def run_youtube(job_id, url, csv_path=None, assemblyai_key=None, gemini_key=None
 
 
 def run_local_video(
-    job_id, video_path, title, csv_path=None, assemblyai_key=None, gemini_key=None
+    job_id,
+    video_path,
+    title,
+    csv_path=None,
+    assemblyai_key=None,
+    gemini_key=None,
+    owner="",
 ):
     try:
         shorthand_list = _get_shorthand_list(csv_path)
 
-        output_dir = os.path.join("outputs", title)
+        output_dir, result_url = _output_paths(owner, title)
         os.makedirs(output_dir, exist_ok=True)
         save_info(output_dir, title, source=os.path.abspath(video_path))
 
@@ -191,7 +212,7 @@ def run_local_video(
             job_id,
             "Done!",
             status="done",
-            result_url=f"/outputs/{title}/pacenotes.html",
+            result_url=result_url,
         )
     except QuotaError as e:
         _set(job_id, str(e), status="error")
@@ -201,12 +222,12 @@ def run_local_video(
 
 
 def run_transcription_file(
-    job_id, transcription_path, title, csv_path=None, gemini_key=None
+    job_id, transcription_path, title, csv_path=None, gemini_key=None, owner=""
 ):
     try:
         shorthand_list = _get_shorthand_list(csv_path)
 
-        output_dir = os.path.join("outputs", title)
+        output_dir, result_url = _output_paths(owner, title)
         os.makedirs(output_dir, exist_ok=True)
 
         _set(job_id, "Loading transcription...")
@@ -226,7 +247,7 @@ def run_transcription_file(
             job_id,
             "Done!",
             status="done",
-            result_url=f"/outputs/{title}/pacenotes.html",
+            result_url=result_url,
         )
     except QuotaError as e:
         _set(job_id, str(e), status="error")
@@ -235,11 +256,11 @@ def run_transcription_file(
         _set(job_id, str(e), status="error")
 
 
-def run_rerender(job_id, pacenotes_path, title, csv_path=None):
+def run_rerender(job_id, pacenotes_path, title, csv_path=None, owner=""):
     try:
         shorthand_list = _get_shorthand_list(csv_path)
 
-        output_dir = os.path.join("outputs", title)
+        output_dir, result_url = _output_paths(owner, title)
         os.makedirs(output_dir, exist_ok=True)
 
         _set(job_id, "Loading pace notes...")
@@ -262,7 +283,7 @@ def run_rerender(job_id, pacenotes_path, title, csv_path=None):
             job_id,
             "Done!",
             status="done",
-            result_url=f"/outputs/{title}/pacenotes.html",
+            result_url=result_url,
         )
     except QuotaError as e:
         _set(job_id, str(e), status="error")
@@ -311,6 +332,7 @@ def process():
     job_id = str(uuid.uuid4())
     _set(job_id, "Starting...")
     assemblyai_key, gemini_key = get_api_keys()
+    owner = _owner()
 
     # Optional shorthand upload (CSV / XLSX / XLS) — saved to disk for background thread
     csv_path = None
@@ -331,7 +353,7 @@ def process():
             return jsonify({"error": "No URL provided"}), 400
         threading.Thread(
             target=run_youtube,
-            args=(job_id, url, csv_path, assemblyai_key, gemini_key),
+            args=(job_id, url, csv_path, assemblyai_key, gemini_key, owner),
             daemon=True,
         ).start()
 
@@ -342,7 +364,15 @@ def process():
         save_path, title = _save_upload(f, job_id)
         threading.Thread(
             target=run_local_video,
-            args=(job_id, save_path, title, csv_path, assemblyai_key, gemini_key),
+            args=(
+                job_id,
+                save_path,
+                title,
+                csv_path,
+                assemblyai_key,
+                gemini_key,
+                owner,
+            ),
             daemon=True,
         ).start()
 
@@ -354,7 +384,7 @@ def process():
         title = _safe_name(request.form.get("title", "").strip(), file_title)
         threading.Thread(
             target=run_transcription_file,
-            args=(job_id, save_path, title, csv_path, gemini_key),
+            args=(job_id, save_path, title, csv_path, gemini_key, owner),
             daemon=True,
         ).start()
 
@@ -368,7 +398,9 @@ def process():
             file_title.replace("_pacenotes", ""),
         )
         threading.Thread(
-            target=run_rerender, args=(job_id, save_path, title, csv_path), daemon=True
+            target=run_rerender,
+            args=(job_id, save_path, title, csv_path, owner),
+            daemon=True,
         ).start()
 
     else:
@@ -396,6 +428,10 @@ def status(job_id):
 @app.route("/outputs/<path:filepath>")
 @login_required
 def serve_output(filepath):
+    # With the gate on, each session may only read its own folder
+    owner = _owner()
+    if owner and not os.path.normpath(filepath).startswith(owner + os.sep):
+        return "Not found", 404
     return send_from_directory("outputs", filepath)
 
 
