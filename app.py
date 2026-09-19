@@ -1,6 +1,9 @@
+import glob
 import hmac
 import os
 import re
+import shutil
+import time
 import uuid
 import threading
 import logging
@@ -135,9 +138,48 @@ def _set(job_id, message, status="running", result_url=None):
     jobs[job_id] = {"status": status, "message": message, "result_url": result_url}
 
 
+def _drop_audio(output_dir):
+    """Audio is only needed for transcription; don't keep it on disk afterwards."""
+    for path in glob.glob(os.path.join(output_dir or "", "audio.*")):
+        os.remove(path)
+
+
+def _start_job(target, job_id, *args):
+    """Run a job in the background, then delete its uploads (all named <job_id>*)."""
+
+    def run():
+        try:
+            target(job_id, *args)
+        finally:
+            for path in glob.glob(os.path.join(UPLOAD_DIR, f"{job_id}*")):
+                os.remove(path)
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+OUTPUT_TTL_SECONDS = 7 * 24 * 3600
+_SESSION_DIR = re.compile(r"^[0-9a-f]{32}$")
+
+
+def _sweep_old_outputs():
+    """Hourly: delete session folders idle 7+ days. Local outputs/<title> is never touched."""
+    while True:
+        cutoff = time.time() - OUTPUT_TTL_SECONDS
+        for name in os.listdir("outputs"):
+            path = os.path.join("outputs", name)
+            if _SESSION_DIR.match(name) and os.path.getmtime(path) < cutoff:
+                shutil.rmtree(path, ignore_errors=True)
+                logging.info("Swept expired outputs folder %s", name)
+        time.sleep(3600)
+
+
+threading.Thread(target=_sweep_old_outputs, daemon=True).start()
+
+
 def run_youtube(
     job_id, url, csv_path=None, assemblyai_key=None, gemini_key=None, owner=""
 ):
+    output_dir = None
     try:
         shorthand_list = _get_shorthand_list(csv_path)
 
@@ -174,6 +216,8 @@ def run_youtube(
     except Exception as e:
         logging.exception("Job %s failed", job_id)
         _set(job_id, str(e), status="error")
+    finally:
+        _drop_audio(output_dir)
 
 
 def run_local_video(
@@ -185,6 +229,7 @@ def run_local_video(
     gemini_key=None,
     owner="",
 ):
+    output_dir = None
     try:
         shorthand_list = _get_shorthand_list(csv_path)
 
@@ -219,6 +264,8 @@ def run_local_video(
     except Exception as e:
         logging.exception("Job %s failed", job_id)
         _set(job_id, str(e), status="error")
+    finally:
+        _drop_audio(output_dir)
 
 
 def run_transcription_file(
@@ -303,6 +350,7 @@ def auth():
     code = request.form.get("invite_code", "").strip()
     if INVITE_CODE and hmac.compare_digest(code.encode(), INVITE_CODE.encode()):
         session["authenticated"] = True
+        _owner()  # assign the output folder at sign-in, not on first job
         return redirect(url_for("index"))
     return render_template("index.html", **_gate_ctx(), auth_error=True)
 
@@ -315,6 +363,7 @@ def byok():
         return render_template("index.html", **_gate_ctx(), byok_error=True)
     session["byok_assemblyai_key"] = assemblyai_key
     session["byok_gemini_key"] = gemini_key
+    _owner()
     return redirect(url_for("index"))
 
 
@@ -351,30 +400,25 @@ def process():
         url = request.form.get("url", "").strip()
         if not url:
             return jsonify({"error": "No URL provided"}), 400
-        threading.Thread(
-            target=run_youtube,
-            args=(job_id, url, csv_path, assemblyai_key, gemini_key, owner),
-            daemon=True,
-        ).start()
+        _start_job(
+            run_youtube, job_id, url, csv_path, assemblyai_key, gemini_key, owner
+        )
 
     elif mode == "local":
         f = request.files.get("file")
         if not f:
             return jsonify({"error": "No file provided"}), 400
         save_path, title = _save_upload(f, job_id)
-        threading.Thread(
-            target=run_local_video,
-            args=(
-                job_id,
-                save_path,
-                title,
-                csv_path,
-                assemblyai_key,
-                gemini_key,
-                owner,
-            ),
-            daemon=True,
-        ).start()
+        _start_job(
+            run_local_video,
+            job_id,
+            save_path,
+            title,
+            csv_path,
+            assemblyai_key,
+            gemini_key,
+            owner,
+        )
 
     elif mode == "transcription":
         f = request.files.get("file")
@@ -382,11 +426,15 @@ def process():
             return jsonify({"error": "No file provided"}), 400
         save_path, file_title = _save_upload(f, job_id)
         title = _safe_name(request.form.get("title", "").strip(), file_title)
-        threading.Thread(
-            target=run_transcription_file,
-            args=(job_id, save_path, title, csv_path, gemini_key, owner),
-            daemon=True,
-        ).start()
+        _start_job(
+            run_transcription_file,
+            job_id,
+            save_path,
+            title,
+            csv_path,
+            gemini_key,
+            owner,
+        )
 
     elif mode == "rerender":
         f = request.files.get("file")
@@ -397,11 +445,7 @@ def process():
             request.form.get("title", "").strip(),
             file_title.replace("_pacenotes", ""),
         )
-        threading.Thread(
-            target=run_rerender,
-            args=(job_id, save_path, title, csv_path, owner),
-            daemon=True,
-        ).start()
+        _start_job(run_rerender, job_id, save_path, title, csv_path, owner)
 
     else:
         return jsonify({"error": "Unknown mode"}), 400

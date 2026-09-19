@@ -10,7 +10,7 @@ CoRecce takes a YouTube link or local video file, transcribes the audio, and use
 
 ## Try it online
 
-**[armchair-recce.up.railway.app](https://armchair-recce.up.railway.app)** — no install needed. Two ways in:
+**[recce.sudochown.ai](https://recce.sudochown.ai)** — no install needed. Two ways in:
 
 - **Bring your own keys** — paste a free [AssemblyAI](https://www.assemblyai.com/dashboard/signup) key and a free [Gemini](https://aistudio.google.com/app/apikey) key. They're kept only in your browser session and cleared when you sign out.
 - **Access code** — if I've given you one, it runs on my keys.
