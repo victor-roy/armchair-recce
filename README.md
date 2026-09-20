@@ -12,10 +12,10 @@ CoRecce takes a YouTube link or local video file, transcribes the audio, and use
 
 **[recce.sudochown.ai](https://recce.sudochown.ai)** — no install needed. Two ways in:
 
-- **Bring your own keys** — paste a free [AssemblyAI](https://www.assemblyai.com/dashboard/signup) key and a free [Gemini](https://aistudio.google.com/app/apikey) key. They're kept only in your browser session and cleared when you sign out.
+- **Bring your own keys** — paste a free [AssemblyAI](https://www.assemblyai.com/dashboard/signup) key and a free [Gemini](https://aistudio.google.com/app/apikey) key. They're kept only in your browser session and cleared when you end the session.
 - **Access code** — if I've given you one, it runs on my keys.
 
-Your outputs are private to your browser session. Signing out ends that session, so save or print your pace notes first.
+Your outputs are private to your browser session. Ending the session clears them, so save or print your pace notes first.
 
 ---
 
