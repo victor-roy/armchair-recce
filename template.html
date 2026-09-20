@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Rally Pace Notes</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -136,10 +136,12 @@
             display: flex;
             gap: 0.25rem;
             opacity: 0;
+            pointer-events: none;  /* invisible buttons must not catch taps */
             transition: opacity 0.15s;
             flex-shrink: 0;
         }
-        .pacenote:hover .note-actions { opacity: 1; }
+        @media (hover: hover) { .pacenote:hover .note-actions { opacity: 1; pointer-events: auto; } }
+        .pacenote.selected .note-actions { opacity: 1; pointer-events: auto; }
 
         .note-actions button {
             background: none;
@@ -185,6 +187,36 @@
             #hint { display: none; }
             .page { padding: 1rem 1rem 1rem 0.5rem; }
             .pacenote { width: calc(100vw - 1.5rem); font-size: 1.4rem; }
+        }
+
+        /* ── Touch: controls in a bottom bar, within thumb reach ── */
+        @media (pointer: coarse) {
+            html, body { overscroll-behavior: none; }
+            #header { display: contents; }
+            #title {
+                order: 1;
+                flex: none;
+                margin-right: 0;
+                padding: 0.6rem 1rem;
+                padding-top: max(0.6rem, env(safe-area-inset-top));
+                border-bottom: 2px solid var(--accent);
+            }
+            #stage { order: 2; touch-action: pinch-zoom; }
+            #nav {
+                order: 3;
+                width: 100%;
+                justify-content: space-between;
+                gap: 0.4rem;
+                padding: 0.5rem 0.75rem;
+                padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+                border-top: 2px solid var(--accent);
+            }
+            #nav button { min-height: 44px; flex: 1; padding: 0 0.4rem; }
+            #nav label { display: none; }
+            #page-counter { min-width: 3.5rem; }
+            #hint, #printout { order: 4; }
+            #hint { display: none; }
+            .note-actions button { min-width: 44px; min-height: 44px; }
         }
 
         /* ── Print ──────────────────────────────────────────── */
@@ -366,6 +398,12 @@
 
         const row = document.createElement('div');
         row.className = 'pacenote';
+        // Tap a note to show its insert/delete buttons (touch has no hover)
+        row.addEventListener('click', e => {
+            if (e.target.closest('button')) return;
+            document.querySelectorAll('.pacenote.selected').forEach(r => { if (r !== row) r.classList.remove('selected'); });
+            row.classList.toggle('selected');
+        });
 
         const num = document.createElement('span');
         num.className = 'note-num';
@@ -454,6 +492,33 @@
     }
 
     function changePage(dir) { showPage(current + dir); }
+
+    // ── Touch: swipe, or tap the outer edges, to change page ─────────────────
+    // Middle taps are left alone so a note can be tapped (select) or double-tapped (edit).
+    let touchStart = null;
+    stage.addEventListener('touchstart', e => {
+        const editing = document.querySelector('.note-text[contenteditable="true"]');
+        if (e.touches.length !== 1 || editing) { touchStart = null; return; }
+        const t = e.touches[0];
+        touchStart = { x: t.clientX, y: t.clientY, target: e.target };
+    }, { passive: true });
+
+    stage.addEventListener('touchend', e => {
+        if (!touchStart) return;
+        const start = touchStart;
+        touchStart = null;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - start.x, dy = t.clientY - start.y;
+        if (Math.max(Math.abs(dx), Math.abs(dy)) >= 50) {
+            const d = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+            changePage(d < 0 ? 1 : -1);  // swipe left/up = next
+            return;
+        }
+        if (start.target.closest('button')) return;
+        const edge = window.innerWidth * 0.2;
+        if (start.x > window.innerWidth - edge) { e.preventDefault(); changePage(1); }
+        else if (start.x < edge) { e.preventDefault(); changePage(-1); }
+    });
 
     document.addEventListener('keydown', e => {
         if (document.querySelector('.note-text[contenteditable="true"]')) return;
@@ -550,6 +615,7 @@
             el.contentEditable = 'false';
         });
 
+        document.querySelectorAll('.pacenote.selected').forEach(r => r.classList.remove('selected'));
         const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
         const blob = new Blob([html], { type: 'text/html' });
         const a = document.createElement('a');
